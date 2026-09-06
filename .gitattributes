@@ -1,0 +1,11 @@
+# Keep project-controlled text byte-stable across developer platforms.
+* text=auto eol=lf
+
+# Common binary artifacts.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.zip binary
