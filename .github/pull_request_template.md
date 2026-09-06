@@ -25,7 +25,7 @@ Check every class that applies.
 - Hosted base `main` SHA: `...`
 - Branch/head SHA reviewed: `...`
 - Core architecture SHA/tree verified: `...`
-- Active hosted ruleset / required checks: `...`
+- Active hosted ruleset / required checks + expected status-check source: `...`
 - Current provider/toolchain documentation verified where relevant: `...`
 
 ## Scope-boundary decision
@@ -61,7 +61,7 @@ Check every class that applies.
 
 <!-- Crashes, lost responses, duplicates, retries, stale generation, PITR, cancellation races, permission loss, privacy change, ref races, ambiguous publication, provider outage, version skew, etc. -->
 
-For architecture/protocol/security/state/licensing changes, confirm the full exact-head attack was completed and **all material findings were enumerated before corrections**.
+For material development-pipeline/repository-policy/CI-self-protection changes and architecture/protocol/security/state/licensing changes, confirm the full exact-head attack was completed and **all material findings were enumerated before corrections**.
 
 ## Licensing / commercial-model gate
 

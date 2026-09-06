@@ -52,7 +52,7 @@ For every material change, record:
 
 ## 5. Adversarial review method
 
-For architecture, protocol, state-machine, authentication/authorization, journal/evidence, publication, recovery, trust-boundary, or licensing/commercial-model changes:
+For material development-pipeline, repository-policy, CI-self-protection/validation-guard changes, and for architecture, protocol, state-machine, authentication/authorization, journal/evidence, publication, recovery, trust-boundary, or licensing/commercial-model changes:
 
 1. freeze one exact head/base;
 2. attack the complete relevant design and enumerate **all material findings before editing**;
@@ -63,6 +63,8 @@ For architecture, protocol, state-machine, authentication/authorization, journal
 7. repeat until a full pass requires zero corrections.
 
 Finding #1 can fail the gate, but it does not end the investigation. Stop-first review is prohibited because it hides interacting defects and produces serial patch churn.
+
+Low-risk documentation or mechanical changes do not automatically enter this cycle merely because they touch repository files; the requirement follows the material impact classification above.
 
 ## 6. Licensing boundary
 

@@ -14,7 +14,7 @@ Architecture authority is the accepted Phase 2.6 design in `runethread/core`, bo
 2. agent/process/development-pipeline policy;
 3. CODEOWNERS, PR review template, Dependabot for Actions, LF-stable text;
 4. read-only SHA-pinned validation workflow with policy self-tests;
-5. active `main` ruleset requiring PR + strict `validate` and blocking destructive ref updates **before** bootstrap merge;
+5. active `main` ruleset requiring PR + strict `validate` from the GitHub Actions expected source/App and blocking destructive ref updates **before** bootstrap merge;
 6. exact-head merge/post-merge verification.
 
 ## Explicit non-goals
@@ -36,7 +36,7 @@ This bootstrap slice does NOT:
 
 - exact bootstrap PR passes `validate`;
 - canonical diff contains only declared repository/process/pipeline files;
-- repository ruleset is active before merge with required PR/strict-`validate`/no destructive ref update/no ordinary bypass behavior;
+- repository ruleset is active before merge with required PR/strict-`validate` bound to the GitHub Actions expected source, no destructive ref update, and no ordinary bypass behavior;
 - exact reviewed head is merged with expected-head protection;
 - post-merge `main` validation passes;
 - Core tracking issue records the hosted repository/bootstrap boundary;

@@ -106,10 +106,12 @@ Before readiness:
 As soon as this repository has a successful `validate` status check that GitHub can select, and **before bootstrap merge**, activate a ruleset equivalent to the Core safety posture:
 
 - pull request required for `main`;
-- strict/up-to-date required `validate` check;
+- strict/up-to-date required `validate` check bound to the GitHub Actions expected source/App, not an unrestricted "any source" status context;
 - branch deletion blocked;
 - non-fast-forward/force updates blocked;
 - no ordinary bypass.
+
+At bootstrap review time, the live Core `Protect main` ruleset binds `validate` to GitHub Actions (`integration_id: 15368`). Treat the named expected source as the invariant and live-verify the current source/integration when configuring hosted rather than relying on an unverified historical ID. Read back the complete hosted ruleset, including the required-check source binding, before readiness.
 
 If GitHub cannot establish that exact protection before merge, do not merge; report the blocker and keep the bootstrap draft.
 
