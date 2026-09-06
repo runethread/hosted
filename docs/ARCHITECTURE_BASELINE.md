@@ -1,6 +1,12 @@
 # Hosted architecture baseline
 
-Status: **Bootstrap authority**
+Status: **Pinned bootstrap reference — non-authoritative**
+
+## Normative authority
+
+The normative Phase 2.6 architecture authority lives in `runethread/core` and its accepted ADRs. This hosted file is only a pinned bootstrap reference. It MUST NOT compete with, override, or silently reinterpret a later accepted Core decision.
+
+Before substantive hosted work, live-fetch the current Core state. If current accepted Core architecture materially differs from this reference, stop hosted implementation and reconcile this file through review before proceeding.
 
 ## Exact accepted source
 
@@ -15,7 +21,7 @@ Bootstrap source:
 - tracking issue: `runethread/core#20`
 - released Core prerequisite: Runethread v0.9.0 / contract v9
 
-This pin records the architecture adopted when `runethread/hosted` was bootstrapped. It is not permission to ignore later accepted Core architecture changes. Before substantive hosted work, verify the current Core state. If a later accepted decision materially changes a hosted invariant, update this baseline deliberately through review before implementing against the new design.
+This pin records the architecture adopted when `runethread/hosted` was bootstrapped. It is not permission to ignore later accepted Core architecture changes.
 
 ## Required boundaries
 
@@ -50,7 +56,7 @@ Re-verified on 2026-09-06 from current Cloudflare documentation before repositor
 - TypeScript is first-class for Workers and Cloudflare recommends generated Worker types via `wrangler types`;
 - Cloudflare recommends `wrangler.jsonc` for new projects;
 - `wrangler types --check` can verify committed generated types in CI;
-- new Durable Object namespaces must use the SQLite storage backend;
+- Cloudflare recommends SQLite for all new Durable Objects. As of this bootstrap, accounts without an existing legacy KV-backed Durable Object namespace can no longer create new KV-backed namespaces, while accounts with an existing legacy KV-backed namespace retain a temporary legacy exception. Runethread independently requires SQLite for every new hosted Durable Object namespace;
 - Cloudflare's current recommended Workers Vitest integration is `@cloudflare/vitest-plugin`.
 
 These are provider/tooling observations, not new architecture. Exact dependency versions and configuration are selected in a separate dependency/toolchain change with a lockfile and CI evidence.

@@ -8,67 +8,275 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from check_development_policy import package_errors, secret_path_errors, workflow_errors
+from check_development_policy import (
+    package_errors,
+    parse_tracked_manifest,
+    secret_path_errors,
+    workflow_errors,
+)
+
+CHECKOUT_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"
+
+VALID_WORKFLOW = f"""name: Validate Runethread Hosted
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@{CHECKOUT_SHA} # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check patch whitespace
+        shell: bash
+        env:
+          BASE_SHA: ${{{{ github.event.pull_request.base.sha }}}}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            git diff --check "$BASE_SHA"...HEAD
+          elif git rev-parse HEAD^ >/dev/null 2>&1; then
+            git diff --check HEAD^ HEAD
+          else
+            git diff-tree --check --root HEAD
+          fi
+
+      - name: Test development policy guard
+        run: |
+          python3 -m py_compile scripts/check_development_policy.py scripts/check_development_policy_test.py
+          python3 scripts/check_development_policy_test.py
+
+      - name: Enforce development policy
+        run: python3 scripts/check_development_policy.py
+
+  validate:
+    name: validate
+    if: always()
+    needs: [quality]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every validation gate
+        env:
+          QUALITY_RESULT: ${{{{ needs.quality.result }}}}
+        run: test "$QUALITY_RESULT" = "success"
+"""
 
 
 class WorkflowPolicyTests(unittest.TestCase):
-    def test_full_sha_read_only_workflow_is_allowed(self) -> None:
-        text = """permissions:\n  contents: read\njobs:\n  validate:\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n"""
-        self.assertEqual(workflow_errors(text), [])
+    def test_exact_bootstrap_workflow_is_allowed(self) -> None:
+        self.assertEqual(workflow_errors(VALID_WORKFLOW), [])
 
     def test_mutable_action_ref_is_rejected(self) -> None:
-        text = """permissions:\n  contents: read\njobs:\n  validate:\n    steps:\n      - uses: actions/checkout@v7\n"""
-        self.assertTrue(any("full commit SHA" in error for error in workflow_errors(text)))
+        text = VALID_WORKFLOW.replace(f"actions/checkout@{CHECKOUT_SHA}", "actions/checkout@v7")
+        errors = workflow_errors(text)
+        self.assertTrue(any("unpinned uses" in error or "checkout" in error for error in errors))
+
+    def test_quoted_uses_key_is_rejected(self) -> None:
+        text = VALID_WORKFLOW.replace("        uses: actions/checkout@", '        "uses": actions/checkout@')
+        self.assertTrue(any("noncanonical" in error for error in workflow_errors(text)))
+
+    def test_unreviewed_action_is_rejected(self) -> None:
+        text = VALID_WORKFLOW.replace("actions/checkout@", "actions/setup-node@")
+        self.assertTrue(any("not allowlisted" in error for error in workflow_errors(text)))
+
+    def test_local_action_is_rejected(self) -> None:
+        text = VALID_WORKFLOW.replace(f"actions/checkout@{CHECKOUT_SHA}", "./.github/actions/local")
+        self.assertTrue(any("noncanonical" in error for error in workflow_errors(text)))
+
+    def test_quoted_on_key_is_rejected(self) -> None:
+        text = VALID_WORKFLOW.replace("on:", '"on":', 1)
+        self.assertTrue(any("canonical top-level on" in error for error in workflow_errors(text)))
+
+    def test_duplicate_jobs_block_is_rejected(self) -> None:
+        text = VALID_WORKFLOW + "\njobs:\n  noop:\n    runs-on: ubuntu-latest\n    steps: []\n"
+        self.assertTrue(any("top-level jobs" in error for error in workflow_errors(text)))
+
+    def test_duplicate_checkout_with_block_is_rejected(self) -> None:
+        text = VALID_WORKFLOW.replace(
+            "          persist-credentials: false",
+            "          persist-credentials: false\n        with:\n          fetch-depth: 0\n          persist-credentials: false",
+        )
+        self.assertTrue(any("canonical with" in error or "persist-credentials" in error for error in workflow_errors(text)))
 
     def test_pull_request_target_is_rejected(self) -> None:
-        text = """on:\n  pull_request_target:\npermissions:\n  contents: read\njobs:\n  validate:\n    steps: []\n"""
+        text = VALID_WORKFLOW.replace("  pull_request:", "  pull_request_target:")
         self.assertTrue(any("pull_request_target" in error for error in workflow_errors(text)))
 
-    def test_write_permission_is_rejected(self) -> None:
-        text = """permissions:\n  contents: write\njobs:\n  validate:\n    steps: []\n"""
+    def test_missing_pull_request_trigger_is_rejected(self) -> None:
+        text = VALID_WORKFLOW.replace("  pull_request:\n", "")
+        self.assertTrue(any("trigger canonically" in error for error in workflow_errors(text)))
+
+    def test_flow_write_permissions_are_rejected(self) -> None:
+        text = VALID_WORKFLOW.replace("permissions:\n  contents: read", "permissions:\n  contents: read\n  issues: write")
         errors = workflow_errors(text)
-        self.assertTrue(any("write permission" in error for error in errors))
+        self.assertTrue(any("permissions must be exactly" in error or "write permission" in error for error in errors))
+
+    def test_job_level_permissions_are_rejected(self) -> None:
+        text = VALID_WORKFLOW.replace("    name: quality", "    name: quality\n    permissions:\n      contents: read")
+        self.assertTrue(any("one canonical top-level permissions" in error for error in workflow_errors(text)))
+
+    def test_missing_persist_credentials_is_rejected(self) -> None:
+        text = VALID_WORKFLOW.replace("          persist-credentials: false\n", "")
+        self.assertTrue(any("persist-credentials" in error for error in workflow_errors(text)))
+
+    def test_quoted_persist_credentials_is_rejected(self) -> None:
+        text = VALID_WORKFLOW.replace("          persist-credentials: false", '          "persist-credentials": false')
+        self.assertTrue(any("persist-credentials" in error for error in workflow_errors(text)))
+
+    def test_true_persist_credentials_is_rejected(self) -> None:
+        text = VALID_WORKFLOW.replace("persist-credentials: false", "persist-credentials: true")
+        self.assertTrue(any("persist-credentials" in error for error in workflow_errors(text)))
+
+    def test_missing_full_fetch_is_rejected(self) -> None:
+        text = VALID_WORKFLOW.replace("          fetch-depth: 0\n", "")
+        self.assertTrue(any("fetch-depth" in error for error in workflow_errors(text)))
+
+    def test_policy_test_invocation_cannot_be_removed(self) -> None:
+        text = VALID_WORKFLOW.replace("          python3 scripts/check_development_policy_test.py\n", "")
+        self.assertTrue(any("check_development_policy_test.py" in error for error in workflow_errors(text)))
+
+    def test_policy_guard_invocation_cannot_be_removed(self) -> None:
+        text = VALID_WORKFLOW.replace("        run: python3 scripts/check_development_policy.py\n", "")
+        self.assertTrue(any("run: python3 scripts/check_development_policy.py" in error for error in workflow_errors(text)))
+
+    def test_validate_cannot_ignore_quality(self) -> None:
+        text = VALID_WORKFLOW.replace("    needs: [quality]", "    needs: []")
+        self.assertTrue(any("needs: [quality]" in error for error in workflow_errors(text)))
+
+    def test_validate_success_test_cannot_be_weakened(self) -> None:
+        text = VALID_WORKFLOW.replace('        run: test "$QUALITY_RESULT" = "success"', "        run: true")
+        self.assertTrue(any("QUALITY_RESULT" in error for error in workflow_errors(text)))
 
 
 class PackagePolicyTests(unittest.TestCase):
+    def _errors_for(self, version: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "package.json").write_text(
+                json.dumps({"private": True, "devDependencies": {"wrangler": version}}),
+                encoding="utf-8",
+            )
+            (root / "package-lock.json").write_text("{}", encoding="utf-8")
+            return package_errors(root / "package.json", root / "package-lock.json")
+
     def test_package_requires_lockfile(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "package.json").write_text('{"private": true}', encoding="utf-8")
             self.assertTrue(package_errors(root / "package.json", root / "package-lock.json"))
 
-    def test_direct_versions_must_be_exact(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            (root / "package.json").write_text(
-                json.dumps({"private": True, "devDependencies": {"wrangler": "^4.129.0"}}),
-                encoding="utf-8",
-            )
-            (root / "package-lock.json").write_text("{}", encoding="utf-8")
-            self.assertTrue(any("exact direct version" in error for error in package_errors(root / "package.json", root / "package-lock.json")))
+    def test_exact_semver_is_allowed(self) -> None:
+        self.assertEqual(self._errors_for("4.129.0"), [])
+        self.assertEqual(self._errors_for("4.129.0-rc.1+build.7"), [])
 
-    def test_private_exact_package_is_allowed(self) -> None:
+    def test_partial_versions_are_rejected(self) -> None:
+        for version in ("1", "1.2"):
+            with self.subTest(version=version):
+                self.assertTrue(self._errors_for(version))
+
+    def test_ranges_and_nonregistry_specifiers_are_rejected(self) -> None:
+        versions = (
+            "^4.129.0",
+            "~4.129.0",
+            ">=4.0.0 <5",
+            "4.x",
+            "latest",
+            "npm:wrangler@^4.129.0",
+            "workspace:*",
+            "file:../x",
+            "git+https://github.com/cloudflare/workers-sdk.git",
+            "https://example.invalid/package.tgz",
+        )
+        for version in versions:
+            with self.subTest(version=version):
+                self.assertTrue(self._errors_for(version))
+
+    def test_invalid_numeric_prerelease_is_rejected(self) -> None:
+        self.assertTrue(self._errors_for("1.2.3-01"))
+
+    def test_invalid_lockfile_json_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / "package.json").write_text(
-                json.dumps({"private": True, "devDependencies": {"wrangler": "4.129.0"}}),
-                encoding="utf-8",
+            (root / "package.json").write_text('{"private": true}', encoding="utf-8")
+            (root / "package-lock.json").write_text("{", encoding="utf-8")
+            self.assertTrue(any("package-lock.json" in error for error in package_errors(root / "package.json", root / "package-lock.json")))
+
+
+class TrackedManifestTests(unittest.TestCase):
+    def test_regular_modes_are_allowed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ("a.txt", "b.py"):
+                (root / name).write_text("x", encoding="utf-8")
+            raw = (
+                b"100644 " + b"a" * 40 + b" 0\ta.txt\0"
+                + b"100755 " + b"b" * 40 + b" 0\tb.py\0"
             )
-            (root / "package-lock.json").write_text("{}", encoding="utf-8")
-            self.assertEqual(package_errors(root / "package.json", root / "package-lock.json"), [])
+            paths, errors = parse_tracked_manifest(raw, root)
+            self.assertEqual(errors, [])
+            self.assertEqual({p.name for p in paths}, {"a.txt", "b.py"})
+
+    def test_symlink_and_gitlink_modes_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            raw = (
+                b"120000 " + b"a" * 40 + b" 0\tlink\0"
+                + b"160000 " + b"b" * 40 + b" 0\tsubmodule\0"
+            )
+            _paths, errors = parse_tracked_manifest(raw, root)
+            self.assertEqual(len(errors), 2)
+            self.assertTrue(all("unsupported tracked Git mode" in error for error in errors))
+
+    def test_nonzero_stage_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "conflict.txt").write_text("x", encoding="utf-8")
+            raw = b"100644 " + b"a" * 40 + b" 2\tconflict.txt\0"
+            _paths, errors = parse_tracked_manifest(raw, root)
+            self.assertTrue(any("non-stage-0" in error for error in errors))
 
 
 class SecretPathTests(unittest.TestCase):
-    def test_secret_files_are_rejected_but_example_is_allowed(self) -> None:
+    def test_secret_files_are_case_insensitive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            secret = root / ".dev.vars"
-            example = root / ".env.example"
-            secret.write_text("TOKEN=x", encoding="utf-8")
-            example.write_text("TOKEN=", encoding="utf-8")
-            errors = secret_path_errors([secret, example])
-            self.assertEqual(len(errors), 1)
-            self.assertIn(".dev.vars", errors[0])
+            paths = []
+            for name in (".env", ".ENV", ".Env.local", ".dev.vars", ".DEV.VARS.prod"):
+                path = root / name
+                path.write_text("TOKEN=x", encoding="utf-8")
+                paths.append(path)
+            errors = secret_path_errors(paths)
+            self.assertEqual(len(errors), len(paths))
+
+    def test_env_examples_are_allowed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            paths = []
+            for name in (".env.example", ".dev.vars.example", ".ENV.EXAMPLE"):
+                path = root / name
+                path.write_text("TOKEN=", encoding="utf-8")
+                paths.append(path)
+            self.assertEqual(secret_path_errors(paths), [])
+
+    def test_common_private_key_names_and_suffixes_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            paths = []
+            for name in ("id_rsa", "ID_ED25519", "service.PPK", "tls.PEM"):
+                path = root / name
+                path.write_text("x", encoding="utf-8")
+                paths.append(path)
+            self.assertEqual(len(secret_path_errors(paths)), len(paths))
 
 
 if __name__ == "__main__":

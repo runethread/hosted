@@ -4,7 +4,9 @@ Status: **Active project policy**
 
 ## 1. Current bootstrap gate
 
-The initial repository bootstrap intentionally carries no Node/Cloudflare dependency graph or deployable hosted runtime. Until the dependency/toolchain PR lands, required validation is:
+The initial repository bootstrap intentionally carries no Node/Cloudflare dependency graph or deployable hosted runtime. Until a separately reviewed policy extension lands, the only admitted GitHub Actions workflow is `.github/workflows/validate.yml`.
+
+Required validation is:
 
 ```text
 git diff --check
@@ -13,28 +15,46 @@ python3 scripts/check_development_policy_test.py
 python3 scripts/check_development_policy.py
 ```
 
-The GitHub workflow must finish with a job named exactly `validate`.
+The GitHub workflow must run on both `push` and `pull_request` and finish with a fail-closed aggregate job named exactly `validate`.
 
 ## 2. CI self-protection
 
-Required validation workflows MUST:
+Bootstrap validation MUST:
 
-- use repository-level `permissions: contents: read` unless a separately reviewed job proves why narrower explicit additional permission is required;
+- use exactly repository-level `permissions: contents: read`;
 - never use `pull_request_target` for ordinary validation;
 - never commit/push repairs;
-- pin every `uses:` Action to an immutable 40-hex commit SHA;
-- reject `persist-credentials: true` in checkout;
-- retain a final aggregate job named `validate`;
-- run the development-policy guard and its negative self-tests.
+- keep checkout at full history (`fetch-depth: 0`) so base/head patch validation is meaningful;
+- keep checkout credentials non-persistent with explicit `persist-credentials: false`;
+- pin every admitted external `uses:` Action to an immutable 40-hex commit SHA;
+- reject alternate/quoted/flow/local/reusable Action syntax unless the guard is deliberately extended in the same reviewed change;
+- admit only `actions/checkout` during this dependency-free bootstrap; adding another Action or workflow requires an explicit policy change and review;
+- retain the policy guard compilation, negative/self-tests, and enforcement invocation;
+- retain the `quality -> validate` dependency and require `quality` to be exactly successful even when the aggregate job runs under `if: always()`.
 
-## 3. Dependency/toolchain admission gate
+The policy scanner is intentionally restrictive instead of pretending to be a general YAML parser. A future workflow shape must extend its accepted grammar and negative tests deliberately.
+
+## 3. Licensing/commercial-model gate
+
+The repository was initially published under MIT. That bootstrap fact is not a frozen long-term licensing decision.
+
+Before the first hosted runtime source or Worker shell is merged:
+
+- make a dedicated reviewed Runethread licensing/commercial-model decision;
+- compare the candidate licenses against the intended open-source/community and commercial boundaries;
+- explicitly decide how future source releases may be used commercially by third parties;
+- record the decision in the owning architecture/governance surface before relying on it.
+
+Code already published under a given license remains subject to that published license; a future change must not be described as retroactively changing previously granted terms.
+
+## 4. Dependency/toolchain admission gate
 
 When the TypeScript/Cloudflare toolchain is introduced, that same PR MUST:
 
 - re-check current Cloudflare and Node support documentation;
 - commit `package.json` and `package-lock.json` together;
 - keep the package `private: true`;
-- pin direct dependency/devDependency versions exactly rather than `latest`, wildcard, caret, or tilde ranges;
+- pin every direct dependency/devDependency/optionalDependency/peerDependency to an exact SemVer version; aliases, ranges, URLs, git/file/workspace specifiers, and other forms are rejected until explicitly reviewed;
 - use lockfile-based clean installation in CI;
 - add generated Worker types and `wrangler types --check`;
 - add TypeScript type checking;
@@ -46,13 +66,27 @@ When the TypeScript/Cloudflare toolchain is introduced, that same PR MUST:
 
 No unlocked dependency graph is accepted merely to bootstrap faster.
 
-## 4. Durable Object/provider implementation gate
+## 5. Hosted release-pipeline prerequisite
+
+Core Phase 2.6 implementation-sequence step 3 requires `runethread/hosted` to have its own development **and release** pipeline before auth/API implementation begins.
+
+The bootstrap PR may remain dependency-free, and the toolchain may be reviewed separately. However, before auth/API code starts, a dedicated release-identity/release-pipeline baseline MUST define at least:
+
+- the exact source/ref and immutable build identity that may become a hosted release;
+- pinned Core/runtime/protocol/schema identities required by the accepted architecture;
+- reproducible build/verification inputs;
+- release provenance and versioning expectations;
+- a clear distinction between producing/verifying a release artifact and deploying it.
+
+That baseline must not silently create production credentials, routes, or deployment authority.
+
+## 6. Durable Object/provider implementation gate
 
 Before journal-dependent coordinator code lands, executable provider spikes must prove the exact primitives relied on by ADR-024/025, including real conditional-create races/lost responses, complete listing/pagination behavior, DO SQLite/PITR/recovery behavior, and any remote publication/quiescence assumptions needed by that implementation slice.
 
 Spikes are evidence, not production shortcuts. A failed premise reopens the owning design before implementation continues.
 
-## 5. Draft PR gate
+## 7. Draft PR gate
 
 Before readiness:
 
@@ -62,9 +96,24 @@ Before readiness:
 4. require exact-head `validate` success;
 5. inspect comments, reviews, and review threads;
 6. re-check base movement and provider premises;
-7. perform required backward/forward/negative/security review.
+7. perform required backward/forward/negative/security review;
+8. for bootstrap, verify the required `main` ruleset is already active before authorizing merge.
 
-## 6. Merge/post-merge gate
+## 8. Repository ruleset target
+
+As soon as this repository has a successful `validate` status check that GitHub can select, and **before bootstrap merge**, activate a ruleset equivalent to the Core safety posture:
+
+- pull request required for `main`;
+- strict/up-to-date required `validate` check;
+- branch deletion blocked;
+- non-fast-forward/force updates blocked;
+- no ordinary bypass.
+
+If GitHub cannot establish that exact protection before merge, do not merge; report the blocker and keep the bootstrap draft.
+
+The current connector cannot create organization repository rulesets, so this external configuration must be configured through an authorized GitHub management surface and then live-read back before readiness.
+
+## 9. Merge/post-merge gate
 
 Merge only the exact reviewed head, preferably squash for iterative branches. After merge verify:
 
@@ -75,15 +124,3 @@ Merge only the exact reviewed head, preferably squash for iterative branches. Af
 - active repository ruleset still requires the intended checks.
 
 Do not start the next milestone slice until post-merge verification passes.
-
-## 7. Repository ruleset target
-
-After the bootstrap workflow has landed on `main`, the repository must acquire an active ruleset equivalent to the Core safety posture:
-
-- pull request required for `main`;
-- strict required `validate` check;
-- branch deletion blocked;
-- non-fast-forward updates blocked;
-- no ordinary bypass.
-
-The current connector cannot create organization repository rulesets, so this external configuration is an explicit bootstrap exit criterion rather than something CI may pretend exists.
