@@ -4,7 +4,7 @@ Status: **Active project policy**
 
 ## 1. Current bootstrap gate
 
-The initial repository bootstrap intentionally carries no Node/Cloudflare dependency graph or deployable hosted runtime. Until a separately reviewed policy extension lands, the only admitted GitHub Actions workflow is `.github/workflows/validate.yml`.
+The initial repository bootstrap intentionally carries no Node/Cloudflare dependency graph or deployable hosted runtime. Until a separately reviewed policy extension lands, the Git-tracked repository manifest is exactly the bootstrap surface enforced by `scripts/check_development_policy.py`, and the only admitted GitHub Actions workflow is `.github/workflows/validate.yml`. Unexpected runtime/provider/toolchain files fail closed.
 
 Required validation is:
 
@@ -21,7 +21,9 @@ The GitHub workflow must run on both `push` and `pull_request` and finish with a
 
 Bootstrap validation MUST:
 
+- match the exact reviewed bootstrap workflow contract/digest; any workflow edit requires a deliberate policy-digest update in the same reviewed change;
 - use exactly repository-level `permissions: contents: read`;
+- run only on the GitHub-hosted `ubuntu-latest` runner during public-repository bootstrap; self-hosted validation is not admitted;
 - never use `pull_request_target` for ordinary validation;
 - never commit/push repairs;
 - keep checkout at full history (`fetch-depth: 0`) so base/head patch validation is meaningful;
@@ -32,7 +34,7 @@ Bootstrap validation MUST:
 - retain the policy guard compilation, negative/self-tests, and enforcement invocation;
 - retain the `quality -> validate` dependency and require `quality` to be exactly successful even when the aggregate job runs under `if: always()`.
 
-The policy scanner is intentionally restrictive instead of pretending to be a general YAML parser. A future workflow shape must extend its accepted grammar and negative tests deliberately.
+The bootstrap policy intentionally does not implement a partial YAML interpreter. It hashes the complete reviewed workflow text, while byte-level CRLF checks separately preserve LF stability. A future workflow shape must update that exact contract and its negative tests deliberately.
 
 ## 3. Licensing/commercial-model gate
 
@@ -52,7 +54,7 @@ Code already published under a given license remains subject to that published l
 When the TypeScript/Cloudflare toolchain is introduced, that same PR MUST:
 
 - re-check current Cloudflare and Node support documentation;
-- commit `package.json` and `package-lock.json` together;
+- commit and Git-track `package.json` and `package-lock.json` together; one-tracked/one-untracked states are forbidden;
 - keep the package `private: true`;
 - pin every direct dependency/devDependency/optionalDependency/peerDependency to an exact SemVer version; aliases, ranges, URLs, git/file/workspace specifiers, and other forms are rejected until explicitly reviewed;
 - use lockfile-based clean installation in CI;

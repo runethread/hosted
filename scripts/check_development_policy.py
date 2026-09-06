@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -10,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
-REQUIRED_FILES = (
+BOOTSTRAP_TRACKED_FILES = (
     "AGENTS.md",
     "README.md",
     "LICENSE",
@@ -30,7 +31,7 @@ REQUIRED_FILES = (
 )
 
 BOOTSTRAP_WORKFLOWS = (".github/workflows/validate.yml",)
-FULL_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+BOOTSTRAP_WORKFLOW_SHA256 = "52119d9fe135ff770243ae375bc16aa696b765106632ae2728857ca6e477823f"
 EXACT_SEMVER_RE = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
     r"(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
@@ -44,134 +45,52 @@ TEXT_SUFFIXES = {".md", ".py", ".yml", ".yaml", ".json", ".jsonc", ".ts", ".js",
 TEXT_NAMES = {".gitattributes", ".gitignore", ".editorconfig"}
 
 
-def _active_yaml_lines(text: str) -> list[str]:
-    lines: list[str] = []
-    for raw in text.splitlines():
-        if "\t" in raw:
-            lines.append(raw.rstrip())
-            continue
-        code = raw.split("#", 1)[0].rstrip()
-        if code.strip():
-            lines.append(code)
-    return lines
-
-
-def _block_children(lines: list[str], index: int, indent: int) -> list[str]:
-    children: list[str] = []
-    for line in lines[index + 1 :]:
-        if len(line) - len(line.lstrip(" ")) <= indent:
-            break
-        children.append(line)
-    return children
-
-
 def workflow_errors(text: str) -> list[str]:
-    """Enforce the deliberately narrow dependency-free bootstrap workflow shape.
+    """Require the exact dependency-free bootstrap workflow contract.
 
-    This is not a general YAML parser. Security-sensitive YAML is required to
-    stay in one canonical block style until a reviewed policy extension changes
-    this guard.
+    Bootstrap validation is deliberately frozen byte-for-byte (after Python's
+    universal newline decoding). Any workflow change must update this digest in
+    the same reviewed policy change. This avoids pretending a partial YAML/text
+    parser can prove executable CI semantics.
     """
 
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    if digest != BOOTSTRAP_WORKFLOW_SHA256:
+        return [
+            "bootstrap workflow must match the exact reviewed contract: "
+            f"expected sha256 {BOOTSTRAP_WORKFLOW_SHA256}, got {digest}"
+        ]
+    return []
+
+
+def bootstrap_manifest_errors(tracked_relatives: set[str]) -> list[str]:
     errors: list[str] = []
-    lines = _active_yaml_lines(text)
-
-    if any("\t" in line for line in lines):
-        errors.append("workflow must not contain tabs")
-
-    if "pull_request_target" in text:
-        errors.append("ordinary validation must not use pull_request_target")
-
-    on_key = re.compile(r'(?<![A-Za-z0-9_-])(?:"on"|\'on\'|on)\s*:')
-    on_lines = [(i, line) for i, line in enumerate(lines) if on_key.search(line)]
-    if len(on_lines) != 1 or on_lines[0][1] != "on:":
-        errors.append("workflow must use one canonical top-level on: block")
-    else:
-        trigger_children = _block_children(lines, on_lines[0][0], 0)
-        if trigger_children != ["  push:", "  pull_request:"]:
-            errors.append("bootstrap workflow must trigger canonically on push and pull_request only")
-
-    permission_key = re.compile(r'(?:"permissions"|\'permissions\'|permissions)\s*:')
-    permission_lines = [(i, line) for i, line in enumerate(lines) if permission_key.search(line)]
-    if len(permission_lines) != 1 or permission_lines[0][1] != "permissions:":
-        errors.append("workflow must declare one canonical top-level permissions block")
-    else:
-        permission_children = _block_children(lines, permission_lines[0][0], 0)
-        if permission_children != ["  contents: read"]:
-            errors.append("workflow permissions must be exactly repository-level contents: read")
-    if re.search(r"\bwrite-all\b|:\s*write\b", "\n".join(lines)):
-        errors.append("validation workflow must not request write permission")
-
-    uses_key = re.compile(r'(?:"uses"|\'uses\'|uses)\s*:')
-    canonical_uses = re.compile(
-        r"^\s*(?:-\s*)?uses:\s*([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.\-/]+)?)@([0-9a-f]{40})$"
-    )
-    uses_lines = [line for line in lines if uses_key.search(line)]
-    parsed_actions: list[tuple[str, str]] = []
-    for line in uses_lines:
-        match = canonical_uses.fullmatch(line)
-        if match is None:
-            errors.append(f"noncanonical or unpinned uses syntax is forbidden: {line.strip()}")
-            continue
-        action, ref = match.groups()
-        if not FULL_SHA_RE.fullmatch(ref):
-            errors.append(f"Action {action}@{ref} is not pinned to a full commit SHA")
-            continue
-        if action != "actions/checkout":
-            errors.append(f"bootstrap workflow Action is not allowlisted: {action}")
-            continue
-        parsed_actions.append((action, ref))
-    if len(parsed_actions) != 1:
-        errors.append("bootstrap workflow must contain exactly one canonical actions/checkout step")
-
-    persist_key = re.compile(r'(?:"persist-credentials"|\'persist-credentials\'|persist-credentials)\s*:')
-    persist_lines = [line for line in lines if persist_key.search(line)]
-    if persist_lines != ["          persist-credentials: false"]:
-        errors.append("checkout must set exactly one canonical persist-credentials: false")
-
-    fetch_depth_key = re.compile(r'(?:"fetch-depth"|\'fetch-depth\'|fetch-depth)\s*:')
-    fetch_depth_lines = [line for line in lines if fetch_depth_key.search(line)]
-    if fetch_depth_lines != ["          fetch-depth: 0"]:
-        errors.append("checkout must set exactly one canonical fetch-depth: 0")
-
-    with_lines = [(i, line) for i, line in enumerate(lines) if re.search(r'(?:"with"|\'with\'|with)\s*:', line)]
-    if len(with_lines) != 1 or with_lines[0][1] != "        with:":
-        errors.append("bootstrap checkout must use exactly one canonical with: block")
-    else:
-        with_children = _block_children(lines, with_lines[0][0], 8)
-        if with_children != ["          fetch-depth: 0", "          persist-credentials: false"]:
-            errors.append("checkout with: block must contain exactly fetch-depth: 0 and persist-credentials: false")
-
-    normalized = "\n".join(lines)
-
-    if sum(1 for line in lines if line == "jobs:") != 1:
-        errors.append("workflow must contain exactly one canonical top-level jobs: block")
-    if sum(1 for line in lines if line == "  quality:") != 1:
-        errors.append("workflow must retain exactly one quality job")
-
-    required_snippets = (
-        'BASE_SHA: ${{ github.event.pull_request.base.sha }}',
-        'git diff --check "$BASE_SHA"...HEAD',
-        "git diff --check HEAD^ HEAD",
-        "git diff-tree --check --root HEAD",
-        "python3 -m py_compile scripts/check_development_policy.py scripts/check_development_policy_test.py",
-        "python3 scripts/check_development_policy_test.py",
-        "run: python3 scripts/check_development_policy.py",
-        "  quality:",
-        "  validate:",
-        "    if: always()",
-        "    needs: [quality]",
-        'QUALITY_RESULT: ${{ needs.quality.result }}',
-        'run: test "$QUALITY_RESULT" = "success"',
-    )
-    for snippet in required_snippets:
-        if snippet not in normalized:
-            errors.append(f"bootstrap validation invariant missing: {snippet}")
-
-    if sum(1 for line in lines if line == "  validate:") != 1:
-        errors.append("workflow must retain exactly one final job id named validate")
-
+    expected = set(BOOTSTRAP_TRACKED_FILES)
+    for relative in sorted(expected - tracked_relatives):
+        errors.append(f"required bootstrap tracked file missing: {relative}")
+    for relative in sorted(tracked_relatives - expected):
+        errors.append(
+            f"unexpected tracked file during dependency-free bootstrap: {relative}; "
+            "extend the reviewed manifest only after the licensing/toolchain gate permits it"
+        )
     return errors
+
+
+def package_manifest_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
+    package_path = root / "package.json"
+    lock_path = root / "package-lock.json"
+    package_tracked = "package.json" in tracked_relatives
+    lock_tracked = "package-lock.json" in tracked_relatives
+
+    if package_tracked != lock_tracked:
+        return ["package.json and package-lock.json must either both be Git-tracked or both be absent"]
+
+    if not package_tracked:
+        if package_path.exists() or lock_path.exists():
+            return ["package.json/package-lock.json must not exist untracked"]
+        return []
+
+    return package_errors(package_path, lock_path)
 
 
 def package_errors(package_path: Path, lock_path: Path) -> list[str]:
@@ -303,9 +222,7 @@ def check_repository(root: Path) -> list[str]:
     errors.extend(manifest_errors)
     tracked_relatives = {path.relative_to(root).as_posix() for path in project_paths}
 
-    for relative in REQUIRED_FILES:
-        if relative not in tracked_relatives:
-            errors.append(f"required tracked file missing: {relative}")
+    errors.extend(bootstrap_manifest_errors(tracked_relatives))
 
     workflows = tuple(
         sorted(
@@ -330,12 +247,7 @@ def check_repository(root: Path) -> list[str]:
             continue
         errors.extend(f"{relative}: {err}" for err in workflow_errors(text))
 
-    package_path = root / "package.json"
-    lock_path = root / "package-lock.json"
-    if "package.json" in tracked_relatives or "package-lock.json" in tracked_relatives:
-        errors.extend(package_errors(package_path, lock_path))
-    elif package_path.exists() or lock_path.exists():
-        errors.append("package.json/package-lock.json must not exist untracked")
+    errors.extend(package_manifest_errors(root, tracked_relatives))
 
     errors.extend(secret_path_errors(project_paths))
     errors.extend(crlf_errors(project_paths))

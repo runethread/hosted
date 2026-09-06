@@ -9,7 +9,10 @@ import unittest
 from pathlib import Path
 
 from check_development_policy import (
+    BOOTSTRAP_TRACKED_FILES,
+    bootstrap_manifest_errors,
     package_errors,
+    package_manifest_errors,
     parse_tracked_manifest,
     secret_path_errors,
     workflow_errors,
@@ -76,86 +79,52 @@ class WorkflowPolicyTests(unittest.TestCase):
     def test_exact_bootstrap_workflow_is_allowed(self) -> None:
         self.assertEqual(workflow_errors(VALID_WORKFLOW), [])
 
-    def test_mutable_action_ref_is_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace(f"actions/checkout@{CHECKOUT_SHA}", "actions/checkout@v7")
-        errors = workflow_errors(text)
-        self.assertTrue(any("unpinned uses" in error or "checkout" in error for error in errors))
+    def test_any_executable_or_structural_mutation_is_rejected(self) -> None:
+        mutations = {
+            "mutable action": VALID_WORKFLOW.replace(f"actions/checkout@{CHECKOUT_SHA}", "actions/checkout@v7"),
+            "quoted uses": VALID_WORKFLOW.replace("        uses: actions/checkout@", '        "uses": actions/checkout@'),
+            "unreviewed action": VALID_WORKFLOW.replace("actions/checkout@", "actions/setup-node@"),
+            "local action": VALID_WORKFLOW.replace(f"actions/checkout@{CHECKOUT_SHA}", "./.github/actions/local"),
+            "pull request target": VALID_WORKFLOW.replace("  pull_request:", "  pull_request_target:"),
+            "write permissions": VALID_WORKFLOW.replace("permissions:\n  contents: read", "permissions:\n  contents: read\n  issues: write"),
+            "persist credentials": VALID_WORKFLOW.replace("persist-credentials: false", "persist-credentials: true"),
+            "shallow checkout": VALID_WORKFLOW.replace("fetch-depth: 0", "fetch-depth: 1"),
+            "self hosted quality": VALID_WORKFLOW.replace("    runs-on: ubuntu-latest", "    runs-on: self-hosted", 1),
+            "skip whitespace": VALID_WORKFLOW.replace("          set -euo pipefail\n", "          exit 0\n          set -euo pipefail\n"),
+            "skip policy tests": VALID_WORKFLOW.replace("          python3 -m py_compile", "          exit 0\n          python3 -m py_compile"),
+            "remove policy guard": VALID_WORKFLOW.replace(
+                "      - name: Enforce development policy\n        run: python3 scripts/check_development_policy.py\n",
+                "",
+            ),
+            "weaken validate dependency": VALID_WORKFLOW.replace("    needs: [quality]", "    needs: []"),
+            "weaken validate result": VALID_WORKFLOW.replace('        run: test "$QUALITY_RESULT" = "success"', "        run: true"),
+        }
+        for name, text in mutations.items():
+            with self.subTest(name=name):
+                self.assertTrue(workflow_errors(text))
 
-    def test_quoted_uses_key_is_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace("        uses: actions/checkout@", '        "uses": actions/checkout@')
-        self.assertTrue(any("noncanonical" in error for error in workflow_errors(text)))
-
-    def test_unreviewed_action_is_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace("actions/checkout@", "actions/setup-node@")
-        self.assertTrue(any("not allowlisted" in error for error in workflow_errors(text)))
-
-    def test_local_action_is_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace(f"actions/checkout@{CHECKOUT_SHA}", "./.github/actions/local")
-        self.assertTrue(any("noncanonical" in error for error in workflow_errors(text)))
-
-    def test_quoted_on_key_is_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace("on:", '"on":', 1)
-        self.assertTrue(any("canonical top-level on" in error for error in workflow_errors(text)))
-
-    def test_duplicate_jobs_block_is_rejected(self) -> None:
-        text = VALID_WORKFLOW + "\njobs:\n  noop:\n    runs-on: ubuntu-latest\n    steps: []\n"
-        self.assertTrue(any("top-level jobs" in error for error in workflow_errors(text)))
-
-    def test_duplicate_checkout_with_block_is_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace(
-            "          persist-credentials: false",
-            "          persist-credentials: false\n        with:\n          fetch-depth: 0\n          persist-credentials: false",
+    def test_substring_spoofing_does_not_restore_acceptance(self) -> None:
+        text = VALID_WORKFLOW.replace("    needs: [quality]", "    needs: []").replace(
+            '        run: test "$QUALITY_RESULT" = "success"',
+            "        run: true",
         )
-        self.assertTrue(any("canonical with" in error or "persist-credentials" in error for error in workflow_errors(text)))
+        text = text.replace(
+            "          set -euo pipefail\n",
+            "          set -euo pipefail\n"
+            '          echo "    needs: [quality]" >/dev/null\n'
+            "          echo 'run: test \"$QUALITY_RESULT\" = \"success\"' >/dev/null\n"
+        )
+        self.assertTrue(workflow_errors(text))
 
-    def test_pull_request_target_is_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace("  pull_request:", "  pull_request_target:")
-        self.assertTrue(any("pull_request_target" in error for error in workflow_errors(text)))
-
-    def test_missing_pull_request_trigger_is_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace("  pull_request:\n", "")
-        self.assertTrue(any("trigger canonically" in error for error in workflow_errors(text)))
-
-    def test_flow_write_permissions_are_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace("permissions:\n  contents: read", "permissions:\n  contents: read\n  issues: write")
-        errors = workflow_errors(text)
-        self.assertTrue(any("permissions must be exactly" in error or "write permission" in error for error in errors))
-
-    def test_job_level_permissions_are_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace("    name: quality", "    name: quality\n    permissions:\n      contents: read")
-        self.assertTrue(any("one canonical top-level permissions" in error for error in workflow_errors(text)))
-
-    def test_missing_persist_credentials_is_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace("          persist-credentials: false\n", "")
-        self.assertTrue(any("persist-credentials" in error for error in workflow_errors(text)))
-
-    def test_quoted_persist_credentials_is_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace("          persist-credentials: false", '          "persist-credentials": false')
-        self.assertTrue(any("persist-credentials" in error for error in workflow_errors(text)))
-
-    def test_true_persist_credentials_is_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace("persist-credentials: false", "persist-credentials: true")
-        self.assertTrue(any("persist-credentials" in error for error in workflow_errors(text)))
-
-    def test_missing_full_fetch_is_rejected(self) -> None:
-        text = VALID_WORKFLOW.replace("          fetch-depth: 0\n", "")
-        self.assertTrue(any("fetch-depth" in error for error in workflow_errors(text)))
-
-    def test_policy_test_invocation_cannot_be_removed(self) -> None:
-        text = VALID_WORKFLOW.replace("          python3 scripts/check_development_policy_test.py\n", "")
-        self.assertTrue(any("check_development_policy_test.py" in error for error in workflow_errors(text)))
-
-    def test_policy_guard_invocation_cannot_be_removed(self) -> None:
-        text = VALID_WORKFLOW.replace("        run: python3 scripts/check_development_policy.py\n", "")
-        self.assertTrue(any("run: python3 scripts/check_development_policy.py" in error for error in workflow_errors(text)))
-
-    def test_validate_cannot_ignore_quality(self) -> None:
-        text = VALID_WORKFLOW.replace("    needs: [quality]", "    needs: []")
-        self.assertTrue(any("needs: [quality]" in error for error in workflow_errors(text)))
-
-    def test_validate_success_test_cannot_be_weakened(self) -> None:
-        text = VALID_WORKFLOW.replace('        run: test "$QUALITY_RESULT" = "success"', "        run: true")
-        self.assertTrue(any("QUALITY_RESULT" in error for error in workflow_errors(text)))
+    def test_command_relocation_spoofing_does_not_restore_acceptance(self) -> None:
+        text = VALID_WORKFLOW.replace(
+            "      - name: Enforce development policy\n        run: python3 scripts/check_development_policy.py\n",
+            "",
+        ).replace(
+            "      - name: Test development policy guard\n",
+            "      - name: Test development policy guard run: python3 scripts/check_development_policy.py\n",
+        )
+        self.assertTrue(workflow_errors(text))
 
 
 class PackagePolicyTests(unittest.TestCase):
@@ -210,6 +179,35 @@ class PackagePolicyTests(unittest.TestCase):
             (root / "package.json").write_text('{"private": true}', encoding="utf-8")
             (root / "package-lock.json").write_text("{", encoding="utf-8")
             self.assertTrue(any("package-lock.json" in error for error in package_errors(root / "package.json", root / "package-lock.json")))
+
+
+class BootstrapManifestPolicyTests(unittest.TestCase):
+    def test_exact_bootstrap_manifest_is_allowed(self) -> None:
+        self.assertEqual(bootstrap_manifest_errors(set(BOOTSTRAP_TRACKED_FILES)), [])
+
+    def test_unexpected_runtime_and_provider_files_are_rejected(self) -> None:
+        for relative in ("src/index.ts", "wrangler.jsonc", "src/worker.js", "package.json"):
+            with self.subTest(relative=relative):
+                tracked = set(BOOTSTRAP_TRACKED_FILES) | {relative}
+                self.assertTrue(any("unexpected tracked file" in e for e in bootstrap_manifest_errors(tracked)))
+
+    def test_missing_bootstrap_file_is_rejected(self) -> None:
+        tracked = set(BOOTSTRAP_TRACKED_FILES) - {"LICENSE"}
+        self.assertTrue(any("LICENSE" in e for e in bootstrap_manifest_errors(tracked)))
+
+    def test_package_and_lock_must_share_tracked_membership(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "package.json").write_text('{"private": true}', encoding="utf-8")
+            (root / "package-lock.json").write_text('{"lockfileVersion": 3}', encoding="utf-8")
+            self.assertTrue(package_manifest_errors(root, {"package.json"}))
+            self.assertTrue(package_manifest_errors(root, {"package-lock.json"}))
+
+    def test_untracked_package_files_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "package-lock.json").write_text('{"lockfileVersion": 3}', encoding="utf-8")
+            self.assertTrue(package_manifest_errors(root, set()))
 
 
 class TrackedManifestTests(unittest.TestCase):

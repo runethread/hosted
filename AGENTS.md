@@ -21,14 +21,16 @@ Conversation history and handoffs are orientation only. If live GitHub state, th
 - Never write directly to `main`. Use a dedicated branch and draft PR.
 - Do not force-push or rewrite ordinary development history.
 - Keep one logical writer per branch and make small coherent commits.
-- Classify changes before editing: development pipeline, dependency/toolchain, hosted protocol/API, provider configuration, Durable Object state/schema, journal/evidence, authentication/authorization, GitHub App permissions, finalizer/auditor/publisher, release/deployment, security/privacy, or Core architecture.
+- Classify changes before editing: development pipeline, dependency/toolchain, hosted protocol/API, provider configuration, Durable Object state/schema, journal/evidence, authentication/authorization, GitHub App permissions, finalizer/auditor/publisher, release/deployment, licensing/commercial-model governance, security/privacy, or Core architecture.
 - Hosted code MUST NOT reimplement Core memory semantics. If a task requires changing semantic mutation rules, stop hosted work and move the design/change to `runethread/core` under its contract/version gates.
 - No plaintext private memory, GitHub tokens, App private keys, Cloudflare secrets, or unrestricted provider error payloads belong in Git, ordinary logs, client-visible status, or rollback journal records.
 - Do not create/deploy Cloudflare resources, GitHub Apps, credentials, publication capabilities, or production routes as a side effect of unrelated implementation.
 - Validation workflows are read-only. They do not repair or push source.
 - All `uses:` references in required GitHub Actions workflows are pinned to immutable full commit SHAs.
 - Do not use `pull_request_target` for ordinary validation.
+- Before the first hosted runtime source or Worker shell is merged, require the dedicated reviewed Runethread licensing/commercial-model decision; do not inherit the bootstrap MIT state as an accidental permanent invariant.
 - If dependencies are introduced, commit the package lock in the same change, keep the service package non-publishable, and review current authoritative provider/toolchain support before selecting versions.
+- Treat license changes as prospective governance changes: existing grants remain governed by the terms under which those bytes were published.
 - Treat provider assumptions as time-sensitive. Re-check Cloudflare/GitHub documentation at the implementation decision point instead of relying on old notes.
 - A green CI run proves only its exact SHA and tested assertions. Perform the negative/failure review required by the engineering process.
 - For adversarial review, enumerate ALL material findings against one exact head before making corrections. Apply the complete correction set together, then perform a fresh full review from scratch. Finding one issue does not terminate the attack pass.

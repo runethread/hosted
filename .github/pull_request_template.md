@@ -7,6 +7,7 @@
 Check every class that applies.
 
 - [ ] Development infrastructure / CI / engineering policy
+- [ ] Licensing / commercial model / source-use boundary
 - [ ] Documentation-only / non-normative
 - [ ] Dependency / TypeScript / Node / Cloudflare toolchain
 - [ ] Hosted protocol / public API
@@ -39,6 +40,7 @@ Check every class that applies.
 | Surface | Impact / evidence |
 | --- | --- |
 | Development pipeline / required checks | |
+| Licensing / commercial model | |
 | Hosted request/status/cancel protocol | |
 | Authentication / caller authorization | |
 | Repository/App/canonical-ref/private binding | |
@@ -59,7 +61,13 @@ Check every class that applies.
 
 <!-- Crashes, lost responses, duplicates, retries, stale generation, PITR, cancellation races, permission loss, privacy change, ref races, ambiguous publication, provider outage, version skew, etc. -->
 
-For architecture/protocol/security/state changes, confirm the full exact-head attack was completed and **all material findings were enumerated before corrections**.
+For architecture/protocol/security/state/licensing changes, confirm the full exact-head attack was completed and **all material findings were enumerated before corrections**.
+
+## Licensing / commercial-model gate
+
+- [ ] No hosted runtime/Worker source is introduced, or the dedicated reviewed Runethread licensing/commercial-model decision is already recorded and linked.
+- [ ] Any license change is described prospectively and does not claim to revoke terms already granted for previously published bytes.
+- [ ] Commercial-use / redistribution implications were reviewed when this change affects licensing or source distribution.
 
 ## Dependency/toolchain gate
 
