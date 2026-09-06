@@ -1,0 +1,24 @@
+# Node / Cloudflare tooling (introduced in a later reviewed slice)
+node_modules/
+.wrangler/
+dist/
+coverage/
+
+# Python policy tooling
+__pycache__/
+*.py[cod]
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Logs / OS / editors
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

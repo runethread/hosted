@@ -1,0 +1,12 @@
+# Safety-critical hosted control-plane surfaces.
+* @Karageorgiou
+
+/AGENTS.md @Karageorgiou
+/docs/ @Karageorgiou
+/.github/workflows/ @Karageorgiou
+/.github/dependabot.yml @Karageorgiou
+/.github/CODEOWNERS @Karageorgiou
+/scripts/ @Karageorgiou
+/package.json @Karageorgiou
+/package-lock.json @Karageorgiou
+/wrangler.jsonc @Karageorgiou
