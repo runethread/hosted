@@ -4,7 +4,7 @@
 
 ## Current default
 
-Runethread-authored Hosted material for which the applicable licensor controls the necessary rights is offered under the **PolyForm Perimeter License 1.0.1** after the protected Hosted transition unless a later reviewed file or boundary says otherwise. See [`LICENSE`](LICENSE).
+Runethread-authored Hosted material for which the applicable licensor controls the necessary rights is offered under the **PolyForm Perimeter License 1.0.1** in public repository snapshots whose root `LICENSE` is that Perimeter license, and on protected `main` after the reviewed Hosted transition merges, unless a later explicit reviewed file or boundary says otherwise. See [`LICENSE`](LICENSE).
 
 The current stated licensor for that newly offered Runethread-owned material is **George Karageorgiou**. GitHub repository or organization ownership is not itself proof of copyright ownership or a relicensing grant.
 
@@ -12,7 +12,7 @@ Core's exact MIT interoperability boundary does **not** automatically extend int
 
 ## Historical MIT grant
 
-This repository was initially published under MIT. [`LICENSE-MIT`](LICENSE-MIT) preserves the exact historical root license text that applied before the protected Perimeter transition.
+This repository was initially published under MIT. [`LICENSE-MIT`](LICENSE-MIT) preserves the exact historical root license text that applied before the Perimeter transition.
 
 The transition is prospective. It does not revoke, narrow, or rewrite rights already granted for Hosted bytes distributed under MIT. In particular, unchanged historical material may still carry rights recipients previously received under MIT. New Runethread-authored Hosted changes are not automatically MIT merely because they descend from an earlier MIT revision.
 
@@ -36,7 +36,9 @@ Before material third-party Hosted source contributions are merged, Runethread m
 
 This licensing transition changes repository governance and the default license for future Runethread-owned Hosted work. It does **not** add or authorize a Worker, Durable Object, R2 bucket, GitHub App, provider credential, deployment, publication capability, runtime source, or production route.
 
-The protected `main` merge of the reviewed transition is the canonical Hosted default-license boundary. Public branch snapshots published before their root `LICENSE` changed remain governed by the terms under which those snapshots were distributed.
+The public development-branch boundary is explicit: commit `fd4928859aaa0ff7105330686daa10217f2952f2` is the first Hosted branch snapshot whose root `LICENSE` is PolyForm Perimeter 1.0.1. Its parent, protected-main commit `ca2282eafca03573ac9c88277125cc6973234959`, still has the historical MIT root license. Earlier public snapshots remain governed by the terms under which they were distributed. From `fd4928859aaa0ff7105330686daa10217f2952f2` onward, newly offered Runethread-owned Hosted material in those branch snapshots follows the Perimeter root to the extent the applicable licensor controls the necessary rights.
+
+The protected `main` merge of the reviewed transition is the canonical Hosted default-license boundary for `main`.
 
 ## Legal review
 
