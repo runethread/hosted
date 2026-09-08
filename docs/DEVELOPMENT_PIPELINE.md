@@ -19,22 +19,24 @@ The GitHub workflow must run on both `push` and `pull_request` and finish with a
 
 ## 2. CI self-protection
 
-Bootstrap validation MUST:
+Pre-runtime validation MUST:
 
-- match the exact reviewed bootstrap workflow contract/digest; any workflow edit requires a deliberate policy-digest update in the same reviewed change;
+- match the exact reviewed workflow contract/digest; any workflow edit requires a deliberate policy-digest update in the same reviewed change;
 - use exactly repository-level `permissions: contents: read`;
-- run only on the GitHub-hosted `ubuntu-latest` runner during public-repository bootstrap; self-hosted validation is not admitted;
+- run only on the GitHub-hosted `ubuntu-latest` runner during this dependency-free pre-runtime gate; self-hosted validation is not admitted;
 - never use `pull_request_target` for ordinary validation;
 - never commit/push repairs;
 - keep checkout at full history (`fetch-depth: 0`) so base/head patch validation is meaningful;
 - keep checkout credentials non-persistent with explicit `persist-credentials: false`;
 - pin every admitted external `uses:` Action to an immutable 40-hex commit SHA;
 - reject alternate/quoted/flow/local/reusable Action syntax unless the guard is deliberately extended in the same reviewed change;
-- admit only `actions/checkout` during this dependency-free bootstrap; adding another Action or workflow requires an explicit policy change and review;
+- admit only `actions/checkout` during this dependency-free pre-runtime gate; adding another Action or workflow requires an explicit policy change and review;
 - retain the policy guard compilation, negative/self-tests, and enforcement invocation;
 - retain the `quality -> validate` dependency and require `quality` to be exactly successful even when the aggregate job runs under `if: always()`.
 
-The bootstrap policy intentionally does not implement a partial YAML interpreter. It hashes the complete reviewed workflow text, while byte-level CRLF checks separately preserve LF stability. A future workflow shape must update that exact contract and its negative tests deliberately.
+The pre-runtime policy intentionally does not implement a partial YAML interpreter. It hashes the complete reviewed workflow text, while byte-level CRLF checks separately preserve LF stability. A future workflow shape must update that exact contract and its negative tests deliberately.
+
+**Self-protection limitation:** the required `validate` workflow and the guard/digest/tests that define its expected shape are all PR-controlled. A same-PR change can therefore alter both the executable workflow and its local policy expectation; green CI cannot attest to its own integrity in that case. Every workflow/guard/policy change still requires canonical exact-head patch inspection, the full adversarial review cycle, and live ruleset verification. A green `validate` result alone never authorizes such a merge.
 
 ## 3. Licensing/commercial-model gate
 
@@ -81,9 +83,10 @@ The bootstrap PR may remain dependency-free, and the toolchain may be reviewed s
 - pinned Core/runtime/protocol/schema identities required by the accepted architecture;
 - reproducible build/verification inputs;
 - release provenance and versioning expectations;
+- verified delivery of the applicable Perimeter terms or URL plus every `Required Notice:` for Perimeter-covered Hosted material, together with every notice required by bundled Core or third-party material; satisfying a bundled MIT notice does not create a prospective MIT exception for Hosted source;
 - a clear distinction between producing/verifying a release artifact and deploying it.
 
-That baseline must not silently create production credentials, routes, or deployment authority.
+No Hosted release artifact may be published until that notice packaging is proven. That baseline must not silently create production credentials, routes, or deployment authority.
 
 ## 6. Durable Object/provider implementation gate
 
