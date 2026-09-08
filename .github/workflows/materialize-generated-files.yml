@@ -1,0 +1,42 @@
+name: Materialize generated toolchain files
+
+on:
+  push:
+    branches:
+      - runethread/toolchain-worker-shell
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: contains(github.event.head_commit.message, 'chore: stage generated-file materializer')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.20.0
+          package-manager-cache: false
+
+      - name: Materialize exact generated files
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f package-lock.json worker-configuration.d.ts
+          npm install --ignore-scripts --no-audit --no-fund
+          npx wrangler types --include-runtime=false worker-configuration.d.ts
+          test "$(sha256sum package-lock.json | awk '{print $1}')" = "dafea88d811a42ccb96a6b1f4cee69212732adb4f8e7b28ab4efb7997db13eb2"
+          test "$(sha256sum worker-configuration.d.ts | awk '{print $1}')" = "167c035cdbe65e17d55fb3e7aa53db8ca3d7a6fa7288d9e0024c05fc5f279195"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json worker-configuration.d.ts
+          git diff --cached --exit-code >/dev/null && { echo "expected generated changes" >&2; exit 1; } || true
+          git commit -m "chore: materialize generated toolchain files [skip materialize]"
+          git push origin HEAD:runethread/toolchain-worker-shell
