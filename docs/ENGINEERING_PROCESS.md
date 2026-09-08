@@ -9,7 +9,7 @@ This repository implements a security- and correctness-sensitive hosted control 
 Before substantive work:
 
 1. fetch exact hosted `main`, branch/base, active PRs, rulesets, and required checks;
-2. read `AGENTS.md`, this document, `DEVELOPMENT_PIPELINE.md`, `CURRENT_MILESTONE.md`, and `ARCHITECTURE_BASELINE.md`;
+2. read `AGENTS.md`, this document, `DEVELOPMENT_PIPELINE.md`, `CURRENT_MILESTONE.md`, `ARCHITECTURE_BASELINE.md`, and `../LICENSING.md`;
 3. live-fetch the relevant accepted ADRs/current milestone from `runethread/core`;
 4. verify current provider documentation for any Cloudflare/GitHub behavior the change relies on;
 5. inspect the existing implementation/tests at the owning layer;
@@ -68,7 +68,11 @@ Low-risk documentation or mechanical changes do not automatically enter this cyc
 
 ## 6. Licensing boundary
 
-The repository was initially published under MIT, but that bootstrap state is not the settled long-term commercial model. Before the first hosted runtime source or Worker shell is merged, the dedicated reviewed Runethread licensing/commercial-model decision must be recorded. A later license change is prospective; never claim that it retroactively withdraws rights already granted for bytes published under an earlier license.
+ADR-026 settles the Hosted licensing/commercial model. After the protected Hosted transition, **PolyForm Perimeter 1.0.1 is the prospective default** for Runethread-owned Hosted material to the extent the applicable licensor controls the necessary rights. Hosted has no prospective MIT exception unless a later explicit reviewed decision creates one; Core's exact MIT interoperability boundary does not automatically extend here.
+
+The repository was initially published under MIT. `LICENSE-MIT` preserves that historical root license, and previously granted MIT rights remain intact. Never describe the transition as retroactively withdrawing or narrowing those grants. `LICENSING.md` is the current Hosted licensing authority.
+
+User-authored memories/projects/imports/attachments/data remain outside Runethread's software-license grants. Before material third-party source contributions are merged, adopt an explicit inbound-rights policy appropriate to the intended commercial/licensing model rather than assuming repository ownership or commit metadata transfers relicensing rights.
 
 ## 7. Provider/security changes
 

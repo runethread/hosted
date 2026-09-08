@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,7 @@ from pathlib import Path
 from check_development_policy import (
     BOOTSTRAP_TRACKED_FILES,
     bootstrap_manifest_errors,
+    licensing_errors,
     package_errors,
     package_manifest_errors,
     parse_tracked_manifest,
@@ -19,6 +21,7 @@ from check_development_policy import (
 )
 
 CHECKOUT_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 VALID_WORKFLOW = f"""name: Validate Runethread Hosted
 
@@ -75,52 +78,78 @@ jobs:
 """
 
 
+def replace_once(text: str, old: str, new: str) -> str:
+    count = text.count(old)
+    if count != 1:
+        raise AssertionError(f"expected exactly one mutation target, got {count}: {old!r}")
+    return text.replace(old, new, 1)
+
+
 class WorkflowPolicyTests(unittest.TestCase):
     def test_exact_bootstrap_workflow_is_allowed(self) -> None:
         self.assertEqual(workflow_errors(VALID_WORKFLOW), [])
 
     def test_any_executable_or_structural_mutation_is_rejected(self) -> None:
         mutations = {
-            "mutable action": VALID_WORKFLOW.replace(f"actions/checkout@{CHECKOUT_SHA}", "actions/checkout@v7"),
-            "quoted uses": VALID_WORKFLOW.replace("        uses: actions/checkout@", '        "uses": actions/checkout@'),
-            "unreviewed action": VALID_WORKFLOW.replace("actions/checkout@", "actions/setup-node@"),
-            "local action": VALID_WORKFLOW.replace(f"actions/checkout@{CHECKOUT_SHA}", "./.github/actions/local"),
-            "pull request target": VALID_WORKFLOW.replace("  pull_request:", "  pull_request_target:"),
-            "write permissions": VALID_WORKFLOW.replace("permissions:\n  contents: read", "permissions:\n  contents: read\n  issues: write"),
-            "persist credentials": VALID_WORKFLOW.replace("persist-credentials: false", "persist-credentials: true"),
-            "shallow checkout": VALID_WORKFLOW.replace("fetch-depth: 0", "fetch-depth: 1"),
-            "self hosted quality": VALID_WORKFLOW.replace("    runs-on: ubuntu-latest", "    runs-on: self-hosted", 1),
-            "skip whitespace": VALID_WORKFLOW.replace("          set -euo pipefail\n", "          exit 0\n          set -euo pipefail\n"),
-            "skip policy tests": VALID_WORKFLOW.replace("          python3 -m py_compile", "          exit 0\n          python3 -m py_compile"),
-            "remove policy guard": VALID_WORKFLOW.replace(
+            "mutable action": replace_once(VALID_WORKFLOW, f"actions/checkout@{CHECKOUT_SHA}", "actions/checkout@v7"),
+            "quoted uses": replace_once(VALID_WORKFLOW, "        uses: actions/checkout@", '        "uses": actions/checkout@'),
+            "unreviewed action": replace_once(VALID_WORKFLOW, "actions/checkout@", "actions/setup-node@"),
+            "local action": replace_once(VALID_WORKFLOW, f"actions/checkout@{CHECKOUT_SHA}", "./.github/actions/local"),
+            "pull request target": replace_once(VALID_WORKFLOW, "  pull_request:\n", "  pull_request_target:\n"),
+            "write permissions": replace_once(VALID_WORKFLOW, "permissions:\n  contents: read", "permissions:\n  contents: read\n  issues: write"),
+            "persist credentials": replace_once(VALID_WORKFLOW, "persist-credentials: false", "persist-credentials: true"),
+            "shallow checkout": replace_once(VALID_WORKFLOW, "fetch-depth: 0", "fetch-depth: 1"),
+            "self hosted quality": replace_once(
+                VALID_WORKFLOW,
+                "  quality:\n    name: quality\n    runs-on: ubuntu-latest",
+                "  quality:\n    name: quality\n    runs-on: self-hosted",
+            ),
+            "skip whitespace": replace_once(
+                VALID_WORKFLOW,
+                "          set -euo pipefail\n",
+                "          exit 0\n          set -euo pipefail\n",
+            ),
+            "skip policy tests": replace_once(
+                VALID_WORKFLOW,
+                "          python3 -m py_compile",
+                "          exit 0\n          python3 -m py_compile",
+            ),
+            "remove policy guard": replace_once(
+                VALID_WORKFLOW,
                 "      - name: Enforce development policy\n        run: python3 scripts/check_development_policy.py\n",
                 "",
             ),
-            "weaken validate dependency": VALID_WORKFLOW.replace("    needs: [quality]", "    needs: []"),
-            "weaken validate result": VALID_WORKFLOW.replace('        run: test "$QUALITY_RESULT" = "success"', "        run: true"),
+            "weaken validate dependency": replace_once(VALID_WORKFLOW, "    needs: [quality]", "    needs: []"),
+            "weaken validate result": replace_once(
+                VALID_WORKFLOW,
+                '        run: test "$QUALITY_RESULT" = "success"',
+                "        run: true",
+            ),
         }
         for name, text in mutations.items():
             with self.subTest(name=name):
                 self.assertTrue(workflow_errors(text))
 
     def test_substring_spoofing_does_not_restore_acceptance(self) -> None:
-        text = VALID_WORKFLOW.replace("    needs: [quality]", "    needs: []").replace(
-            '        run: test "$QUALITY_RESULT" = "success"',
-            "        run: true",
-        )
-        text = text.replace(
+        text = replace_once(VALID_WORKFLOW, "    needs: [quality]", "    needs: []")
+        text = replace_once(text, '        run: test "$QUALITY_RESULT" = "success"', "        run: true")
+        text = replace_once(
+            text,
             "          set -euo pipefail\n",
             "          set -euo pipefail\n"
             '          echo "    needs: [quality]" >/dev/null\n'
-            "          echo 'run: test \"$QUALITY_RESULT\" = \"success\"' >/dev/null\n"
+            "          echo 'run: test \\\"$QUALITY_RESULT\\\" = \\\"success\\\"' >/dev/null\n",
         )
         self.assertTrue(workflow_errors(text))
 
     def test_command_relocation_spoofing_does_not_restore_acceptance(self) -> None:
-        text = VALID_WORKFLOW.replace(
+        text = replace_once(
+            VALID_WORKFLOW,
             "      - name: Enforce development policy\n        run: python3 scripts/check_development_policy.py\n",
             "",
-        ).replace(
+        )
+        text = replace_once(
+            text,
             "      - name: Test development policy guard\n",
             "      - name: Test development policy guard run: python3 scripts/check_development_policy.py\n",
         )
@@ -178,22 +207,12 @@ class PackagePolicyTests(unittest.TestCase):
             root = Path(tmp)
             (root / "package.json").write_text('{"private": true}', encoding="utf-8")
             (root / "package-lock.json").write_text("{", encoding="utf-8")
-            self.assertTrue(any("package-lock.json" in error for error in package_errors(root / "package.json", root / "package-lock.json")))
-
-
-class BootstrapManifestPolicyTests(unittest.TestCase):
-    def test_exact_bootstrap_manifest_is_allowed(self) -> None:
-        self.assertEqual(bootstrap_manifest_errors(set(BOOTSTRAP_TRACKED_FILES)), [])
-
-    def test_unexpected_runtime_and_provider_files_are_rejected(self) -> None:
-        for relative in ("src/index.ts", "wrangler.jsonc", "src/worker.js", "package.json"):
-            with self.subTest(relative=relative):
-                tracked = set(BOOTSTRAP_TRACKED_FILES) | {relative}
-                self.assertTrue(any("unexpected tracked file" in e for e in bootstrap_manifest_errors(tracked)))
-
-    def test_missing_bootstrap_file_is_rejected(self) -> None:
-        tracked = set(BOOTSTRAP_TRACKED_FILES) - {"LICENSE"}
-        self.assertTrue(any("LICENSE" in e for e in bootstrap_manifest_errors(tracked)))
+            self.assertTrue(
+                any(
+                    "package-lock.json" in error
+                    for error in package_errors(root / "package.json", root / "package-lock.json")
+                )
+            )
 
     def test_package_and_lock_must_share_tracked_membership(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -208,6 +227,27 @@ class BootstrapManifestPolicyTests(unittest.TestCase):
             root = Path(tmp)
             (root / "package-lock.json").write_text('{"lockfileVersion": 3}', encoding="utf-8")
             self.assertTrue(package_manifest_errors(root, set()))
+
+
+class BootstrapManifestPolicyTests(unittest.TestCase):
+    def test_exact_bootstrap_manifest_is_allowed(self) -> None:
+        self.assertEqual(bootstrap_manifest_errors(set(BOOTSTRAP_TRACKED_FILES)), [])
+
+    def test_unexpected_runtime_and_provider_files_are_rejected(self) -> None:
+        for relative in ("src/index.ts", "wrangler.jsonc", "src/worker.js", "package.json"):
+            with self.subTest(relative=relative):
+                tracked = set(BOOTSTRAP_TRACKED_FILES) | {relative}
+                self.assertTrue(any("unexpected tracked file" in e for e in bootstrap_manifest_errors(tracked)))
+
+    def test_missing_bootstrap_file_is_rejected(self) -> None:
+        tracked = set(BOOTSTRAP_TRACKED_FILES) - {"README.md"}
+        self.assertTrue(any("README.md" in e for e in bootstrap_manifest_errors(tracked)))
+
+    def test_licensing_files_are_required(self) -> None:
+        for relative in ("LICENSE", "LICENSE-MIT", "LICENSING.md"):
+            with self.subTest(relative=relative):
+                tracked = set(BOOTSTRAP_TRACKED_FILES) - {relative}
+                self.assertTrue(any(relative in e for e in bootstrap_manifest_errors(tracked)))
 
 
 class TrackedManifestTests(unittest.TestCase):
@@ -275,6 +315,149 @@ class SecretPathTests(unittest.TestCase):
                 path.write_text("x", encoding="utf-8")
                 paths.append(path)
             self.assertEqual(len(secret_path_errors(paths)), len(paths))
+
+
+class LicensingPolicyTests(unittest.TestCase):
+    def _copy_authority(self, root: Path) -> set[str]:
+        needed = {
+            "LICENSE",
+            "LICENSE-MIT",
+            "LICENSING.md",
+            "README.md",
+            "AGENTS.md",
+            "docs/CURRENT_MILESTONE.md",
+            "docs/DEVELOPMENT_PIPELINE.md",
+            "docs/ENGINEERING_PROCESS.md",
+            "docs/ARCHITECTURE_BASELINE.md",
+            ".github/pull_request_template.md",
+        }
+        for relative in needed:
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(PROJECT_ROOT / relative, target)
+        return needed
+
+    def test_current_licensing_authority_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tracked = self._copy_authority(root)
+            self.assertEqual(licensing_errors(root, tracked), [])
+
+    def test_exact_legal_and_central_policy_bytes_are_locked(self) -> None:
+        for relative in ("LICENSE", "LICENSE-MIT", "LICENSING.md"):
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                tracked = self._copy_authority(root)
+                path = root / relative
+                path.write_bytes(path.read_bytes() + b"\n")
+                self.assertTrue(
+                    any(relative in error and "sha256" in error for error in licensing_errors(root, tracked))
+                )
+
+    def test_secondary_authority_bytes_are_exact_locked(self) -> None:
+        for relative in (
+            "README.md",
+            "AGENTS.md",
+            "docs/CURRENT_MILESTONE.md",
+            "docs/DEVELOPMENT_PIPELINE.md",
+            "docs/ENGINEERING_PROCESS.md",
+            "docs/ARCHITECTURE_BASELINE.md",
+            ".github/pull_request_template.md",
+        ):
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                tracked = self._copy_authority(root)
+                path = root / relative
+                path.write_bytes(path.read_bytes() + b"\n")
+                self.assertTrue(
+                    any(
+                        relative in error and "expected git blob" in error
+                        for error in licensing_errors(root, tracked)
+                    )
+                )
+
+    def test_current_hosted_mit_claim_variants_are_rejected(self) -> None:
+        claims = (
+            "Runethread Hosted is " + "licensed under " + "MIT.",
+            "Hosted source is " + "distributed under " + "MIT.",
+            "This repository is " + "available under " + "MIT.",
+            "Runethread Hosted uses the " + "MIT License.",
+        )
+        for claim in claims:
+            with self.subTest(claim=claim), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                tracked = self._copy_authority(root)
+                path = root / "README.md"
+                path.write_text(path.read_text(encoding="utf-8") + "\n" + claim + "\n", encoding="utf-8")
+                self.assertTrue(any("stale/current MIT claim" in e for e in licensing_errors(root, tracked)))
+
+    def test_no_extension_tracked_text_is_scanned(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tracked = self._copy_authority(root)
+            path = root / ".github/CODEOWNERS"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            claim = "Runethread Hosted is " + "licensed under " + "MIT."
+            path.write_text("# " + claim + "\n* @owner\n", encoding="utf-8")
+            tracked.add(".github/CODEOWNERS")
+            self.assertTrue(any("stale/current MIT claim" in e for e in licensing_errors(root, tracked)))
+
+    def test_every_tracked_file_must_be_utf8_text_without_nul(self) -> None:
+        for payload, expected in ((b"\xffopaque", "invalid UTF-8"), (b"opaque\x00data", "contains NUL bytes")):
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                tracked = self._copy_authority(root)
+                path = root / "OPAQUE"
+                path.write_bytes(payload)
+                tracked.add("OPAQUE")
+                self.assertTrue(any(expected in e for e in licensing_errors(root, tracked)))
+
+    def test_missing_no_exception_marker_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tracked = self._copy_authority(root)
+            path = root / "docs/ENGINEERING_PROCESS.md"
+            text = path.read_text(encoding="utf-8")
+            text = replace_once(text, "Hosted has no prospective MIT exception", "Hosted licensing boundary")
+            path.write_text(text, encoding="utf-8")
+            self.assertTrue(any("missing licensing invariant marker" in e for e in licensing_errors(root, tracked)))
+
+    def test_unclassified_licensing_vocabulary_is_rejected(self) -> None:
+        phrases = (
+            "Copyright policy draft.",
+            "All rights reserved.",
+            "This component is proprietary.",
+            "Public domain statement.",
+            "Noncommercial use only.",
+            "Patent terms.",
+            "Trademark terms.",
+            "Copyleft terms.",
+            "Dual licensing policy.",
+        )
+        for phrase in phrases:
+            with self.subTest(phrase=phrase), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                tracked = self._copy_authority(root)
+                note = root / "notes.txt"
+                note.write_text(phrase + "\n", encoding="utf-8")
+                tracked.add("notes.txt")
+                self.assertTrue(
+                    any(
+                        "outside the exact reviewed Hosted licensing authority surfaces" in e
+                        for e in licensing_errors(root, tracked)
+                    )
+                )
+
+    def test_contradictory_user_data_claim_on_authority_surface_is_rejected_by_byte_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tracked = self._copy_authority(root)
+            path = root / "README.md"
+            contradiction = "Runethread owns all user-authored memory data."
+            path.write_text(path.read_text(encoding="utf-8") + "\n" + contradiction + "\n", encoding="utf-8")
+            self.assertTrue(
+                any("README.md" in e and "expected git blob" in e for e in licensing_errors(root, tracked))
+            )
 
 
 if __name__ == "__main__":

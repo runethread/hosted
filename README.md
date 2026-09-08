@@ -16,4 +16,6 @@ The bootstrap architecture baseline is the accepted `runethread/core` tree at co
 
 Before changing this repository, read [`AGENTS.md`](AGENTS.md), [`docs/ENGINEERING_PROCESS.md`](docs/ENGINEERING_PROCESS.md), [`docs/DEVELOPMENT_PIPELINE.md`](docs/DEVELOPMENT_PIPELINE.md), and [`docs/CURRENT_MILESTONE.md`](docs/CURRENT_MILESTONE.md).
 
-The current bootstrap validation is intentionally dependency-free. The repository was initially published under MIT, but that is not the settled long-term licensing/commercial model. A dedicated reviewed licensing decision must land before the first hosted runtime source or Worker shell is merged. After that gate, the TypeScript/Cloudflare dependency lock and non-operational runtime shell proceed as a separate reviewed preflight so this repository does not begin with an unreviewed or non-reproducible dependency graph.
+The current validation remains intentionally dependency-free until the next reviewed toolchain slice. ADR-026 establishes **PolyForm Perimeter 1.0.1 as the prospective Hosted implementation default**; the repository's earlier MIT grants remain historical and are preserved in [`LICENSE-MIT`](LICENSE-MIT). Hosted has no prospective MIT interoperability exception of its own. See [`LICENSING.md`](LICENSING.md).
+
+No runtime/Worker source is authorized by the licensing transition itself. After the protected licensing transition is complete, the next separate gate is the reproducibly locked TypeScript/Cloudflare developer toolchain plus a fail-closed non-operational Worker shell.
