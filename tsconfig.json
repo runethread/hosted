@@ -5,7 +5,8 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "noEmit": true,
-    "types": ["./worker-configuration.d.ts"]
+    "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "vitest.config.ts"]
+  "exclude": ["test"],
+  "include": ["worker-configuration.d.ts", "src/**/*.ts"]
 }
