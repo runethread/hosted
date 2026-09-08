@@ -391,6 +391,27 @@ class LicensingPolicyTests(unittest.TestCase):
                 path.write_text(path.read_text(encoding="utf-8") + "\n" + claim + "\n", encoding="utf-8")
                 self.assertTrue(any("stale/current MIT claim" in e for e in licensing_errors(root, tracked)))
 
+    def test_no_extension_tracked_text_is_scanned(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tracked = self._copy_authority(root)
+            path = root / ".github/CODEOWNERS"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            claim = "Runethread Hosted is " + "licensed under " + "MIT."
+            path.write_text("# " + claim + "\n* @owner\n", encoding="utf-8")
+            tracked.add(".github/CODEOWNERS")
+            self.assertTrue(any("stale/current MIT claim" in e for e in licensing_errors(root, tracked)))
+
+    def test_every_tracked_file_must_be_utf8_text_without_nul(self) -> None:
+        for payload, expected in ((b"\xffopaque", "invalid UTF-8"), (b"opaque\x00data", "contains NUL bytes")):
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                tracked = self._copy_authority(root)
+                path = root / "OPAQUE"
+                path.write_bytes(payload)
+                tracked.add("OPAQUE")
+                self.assertTrue(any(expected in e for e in licensing_errors(root, tracked)))
+
     def test_missing_no_exception_marker_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -402,15 +423,30 @@ class LicensingPolicyTests(unittest.TestCase):
             self.assertTrue(any("missing licensing invariant marker" in e for e in licensing_errors(root, tracked)))
 
     def test_unclassified_licensing_vocabulary_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            tracked = self._copy_authority(root)
-            note = root / "notes.txt"
-            note.write_text("Copyright policy draft.\n", encoding="utf-8")
-            tracked.add("notes.txt")
-            self.assertTrue(
-                any("outside the exact reviewed Hosted licensing authority surfaces" in e for e in licensing_errors(root, tracked))
-            )
+        phrases = (
+            "Copyright policy draft.",
+            "All rights reserved.",
+            "This component is proprietary.",
+            "Public domain statement.",
+            "Noncommercial use only.",
+            "Patent terms.",
+            "Trademark terms.",
+            "Copyleft terms.",
+            "Dual licensing policy.",
+        )
+        for phrase in phrases:
+            with self.subTest(phrase=phrase), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                tracked = self._copy_authority(root)
+                note = root / "notes.txt"
+                note.write_text(phrase + "\n", encoding="utf-8")
+                tracked.add("notes.txt")
+                self.assertTrue(
+                    any(
+                        "outside the exact reviewed Hosted licensing authority surfaces" in e
+                        for e in licensing_errors(root, tracked)
+                    )
+                )
 
     def test_contradictory_user_data_claim_on_authority_surface_is_rejected_by_byte_lock(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
