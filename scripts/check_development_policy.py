@@ -36,20 +36,21 @@ BOOTSTRAP_WORKFLOWS = (".github/workflows/validate.yml",)
 BOOTSTRAP_WORKFLOW_SHA256 = "52119d9fe135ff770243ae375bc16aa696b765106632ae2728857ca6e477823f"
 PERIMETER_LICENSE_SHA256 = "bb1d1de338bdbe282f151bf54d6bb6ad98ad37b9592539461fb51ff4bcd4e1c3"
 HISTORICAL_MIT_LICENSE_SHA256 = "273538c6ad97c94dc4230b1b66211a1ebf2769d86fa0bc93cbe2d6670eca88bd"
-LICENSING_POLICY_SHA256 = "1266c20aad8a70ab2bb67dacde3c5fb07017fe26a501a3fdbc95171a69e47ccb"
+LICENSING_POLICY_SHA256 = "215b53b54af9c332f98de19a7cc50c84de568bac1ffc592bade30c106717b593"
 
 # Secondary licensing/governance entrypoints are exact-locked for the current
 # dependency-free pre-runtime gate. These are Git blob object IDs, used only as
 # exact byte-change tripwires; the legal texts and central licensing authority
-# above remain independently SHA-256 locked.
+# above remain independently SHA-256 locked. Exact-head review is still needed
+# because a PR can modify this guard and its expectations together.
 LICENSING_AUTHORITY_GIT_BLOBS = {
     "README.md": "f0585a8e46172e639c408881357acd8f934e6e00",
     "AGENTS.md": "eadfc55c79169cdbf870deaef961eb3c6355ff24",
     "docs/CURRENT_MILESTONE.md": "ac63f9a965ce377ff8633c8acc0e584b4953c4f4",
-    "docs/DEVELOPMENT_PIPELINE.md": "9b62d8d18b1561b9b33a685ea855ab9f8b77792b",
+    "docs/DEVELOPMENT_PIPELINE.md": "a2374bc52659b6597b76ec608aa18bdab8da0232",
     "docs/ENGINEERING_PROCESS.md": "d0d59f1427f83b2fe9b775f1097a1a5c4a8a5de3",
     "docs/ARCHITECTURE_BASELINE.md": "5a2576b62da1843dc5c6f810e5ca7528c0530687",
-    ".github/pull_request_template.md": "785fe374920db808bd76d5ee2d63284a8cce5923",
+    ".github/pull_request_template.md": "83d75e0a6653c36d9c46b1451bca0ebb07042c87",
 }
 
 LICENSING_AUTHORITY_PATHS = frozenset(
@@ -65,6 +66,8 @@ LICENSING_REQUIRED_MARKERS = {
         "fd4928859aaa0ff7105330686daa10217f2952f2",
         "ca2282eafca03573ac9c88277125cc6973234959",
         "User data",
+        "Distribution notices",
+        "every `Required Notice:`",
         "explicit inbound-rights policy",
     ),
     "README.md": (
@@ -87,6 +90,10 @@ LICENSING_REQUIRED_MARKERS = {
         "ADR-026 is the accepted project licensing/commercial-model decision",
         "Hosted has **no prospective MIT exception**",
         "user-authored memories/projects/imports/attachments/data remain outside Runethread's software-license grants",
+        "Self-protection limitation",
+        "green CI cannot attest to its own integrity",
+        "every `Required Notice:`",
+        "No Hosted release artifact may be published until that notice packaging is proven",
     ),
     "docs/ENGINEERING_PROCESS.md": (
         "ADR-026 settles the Hosted licensing/commercial model",
@@ -104,6 +111,8 @@ LICENSING_REQUIRED_MARKERS = {
         "does not create a prospective Hosted MIT exception",
         "User-authored memories, projects, imports, attachments, and other user-owned data",
         "explicit inbound-rights policy",
+        "every `Required Notice:`",
+        "green CI was not treated as self-attestation",
     ),
 }
 
@@ -117,10 +126,15 @@ CURRENT_MIT_CLAIM_RE = re.compile(
 )
 
 LICENSE_VOCAB_RE = re.compile(
-    r"\b(?:MIT|PolyForm|Perimeter|licen[cs](?:e|ed|es|ing|or|ee)?|"
-    r"copyright|rightsholder|relicens\w*|source[- ]available|"
-    r"open[- ]source|commercial(?:ly)?|SPDX-License-Identifier)\b",
-    re.IGNORECASE,
+    r"(?i)(?:"
+    r"\b(?:license|licensed|licenses|licensing|licensor|licensee|licence|licenced|licences|licencing)\b|"
+    r"\brightsholder\b|\bcopyright\b|\bcopyleft\b|\bpolyform\b|\bperimeter\b|\bMIT\b|"
+    r"\bpatents?\b|\btrademarks?\b|\bsource[- ]available\b|\bopen[- ]source\b|"
+    r"\bnon[- ]?commercial\b|\bcommercial(?:ly|ization|isation)?\b|"
+    r"\bdual[- ]licens(?:e|ed|ing)\b|\brelicens(?:e|ed|ing)\b|"
+    r"\bproprietary\b|\bpublic domain\b|\ball rights reserved\b|"
+    r"SPDX-License-Identifier"
+    r")"
 )
 
 EXACT_SEMVER_RE = re.compile(
@@ -355,10 +369,11 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
             if marker not in text:
                 errors.append(f"{relative} missing licensing invariant marker: {marker}")
 
+    # Every tracked file in the current pre-runtime manifest is intentionally
+    # project-controlled text. Scan all of them fail-closed rather than trusting
+    # filename suffixes; future binary admission requires an explicit policy change.
     for relative in sorted(tracked_relatives):
         path = root / relative
-        if path.suffix.lower() not in TEXT_SUFFIXES and path.name not in TEXT_NAMES:
-            continue
         text, read_error = _read_utf8(path)
         if read_error is not None or text is None:
             errors.append(f"cannot scan licensing claims in {relative}: {read_error}")
