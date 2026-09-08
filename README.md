@@ -2,20 +2,22 @@
 
 Cloud-hosted Runethread memory-delivery control plane for Phase 2.6.
 
-**Status:** repository bootstrap and provider/toolchain preflight. No production hosted mutation endpoint, Cloudflare deployment, Durable Object namespace, R2 bucket, GitHub App credential, or publication capability is implemented or authorized by this repository state.
+**Status:** the locked developer toolchain and fail-closed non-operational Worker shell are established. No production hosted mutation endpoint, Cloudflare deployment, Durable Object namespace, R2 bucket, GitHub App credential, publication capability, production route, or release is implemented or authorized by this repository state.
 
 ## Responsibility
 
 `runethread/hosted` owns provider-specific delivery and control-plane code. It must not become a second semantic memory engine.
 
-The user-owned private GitHub repository remains canonical semantic state. `runethread/core` remains the sole implementation of deterministic memory mutation, repository validation, index generation, and mutation commit construction. Hosted code is limited to authentication, authorization, delivery, serialization, evidence, recovery, independent verification, publication, and provider lifecycle responsibilities defined by the accepted Phase 2.6 architecture.
+The user-owned private GitHub repository remains canonical semantic state. `runethread/core` remains the sole implementation of deterministic memory mutation, repository validation, index generation, and mutation commit construction. Hosted code is limited to the control-plane responsibilities defined by the accepted Phase 2.6 architecture.
 
-The bootstrap architecture baseline is the accepted `runethread/core` tree at commit [`22995a7cf7d1c6c0f4ce548fd83667468b356f42`](https://github.com/runethread/core/commit/22995a7cf7d1c6c0f4ce548fd83667468b356f42), including the governing ADR-012 through ADR-025 safety sequence. See [`docs/ARCHITECTURE_BASELINE.md`](docs/ARCHITECTURE_BASELINE.md).
+The historical bootstrap architecture pin is documented in [`docs/ARCHITECTURE_BASELINE.md`](docs/ARCHITECTURE_BASELINE.md). Before substantive work, live-fetch the current accepted Core ADRs and `RUNETHREAD_INVARIANTS.json`; the bootstrap pin is orientation, not authority over later accepted Core decisions.
 
 ## Development
 
 Before changing this repository, read [`AGENTS.md`](AGENTS.md), [`docs/ENGINEERING_PROCESS.md`](docs/ENGINEERING_PROCESS.md), [`docs/DEVELOPMENT_PIPELINE.md`](docs/DEVELOPMENT_PIPELINE.md), and [`docs/CURRENT_MILESTONE.md`](docs/CURRENT_MILESTONE.md).
 
-The current validation remains intentionally dependency-free until the next reviewed toolchain slice. ADR-026 establishes **PolyForm Perimeter 1.0.1 as the prospective Hosted implementation default**; the repository's earlier MIT grants remain historical and are preserved in [`LICENSE-MIT`](LICENSE-MIT). Hosted has no prospective MIT interoperability exception of its own. See [`LICENSING.md`](LICENSING.md).
+The admitted developer toolchain is exact and lockfile-based. Validation runs the policy guard plus the supported Worker runtime test integration on Linux, macOS, and Windows. The shell intentionally returns HTTP 503 and has no bindings, secrets, storage, publication authority, deploy script, or provider resource.
 
-No runtime/Worker source is authorized by the licensing transition itself. After the protected licensing transition is complete, the next separate gate is the reproducibly locked TypeScript/Cloudflare developer toolchain plus a fail-closed non-operational Worker shell.
+ADR-026 establishes **PolyForm Perimeter 1.0.1 as the prospective Hosted implementation default**; the repository's earlier MIT grants remain historical and are preserved in [`LICENSE-MIT`](LICENSE-MIT). Hosted has no prospective MIT interoperability exception of its own. See [`LICENSING.md`](LICENSING.md).
+
+The next separate gate is Hosted release identity and release-pipeline definition. This repository state does not authorize deployment.
