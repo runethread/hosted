@@ -22,6 +22,10 @@ The transition is prospective. It does not revoke, narrow, or rewrite rights alr
 
 Runethread's software licenses do not grant Runethread ownership or software-license rights in user-authored memories, project content, imports, attachments, or other user-owned data merely because Hosted transports, stores, verifies, indexes, or processes that data.
 
+## Distribution notices
+
+Any post-transition Hosted source or build artifact distributed under Perimeter must provide recipients the applicable Perimeter terms or URL and every `Required Notice:` supplied with the software. Bundled Core or third-party material retains its own applicable notice obligations; satisfying those obligations does not create a prospective MIT exception for Hosted source. A Hosted release/distribution pipeline must prove the required notice material is delivered before publishing an artifact.
+
 ## Commercial model
 
 Perimeter-covered Hosted implementation is source-available, not OSI-approved open source. The applicable rightsholder may monetize Runethread through hosted services, subscriptions, advertising, sponsorship, support, partnerships, separate commercial licenses, or other models.
