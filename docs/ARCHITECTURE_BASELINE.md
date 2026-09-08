@@ -23,6 +23,10 @@ Bootstrap source:
 
 This pin records the architecture adopted when `runethread/hosted` was bootstrapped. It is not permission to ignore later accepted Core architecture changes.
 
+## Later accepted governance
+
+ADR-026 was accepted in `runethread/core` after this bootstrap architecture pin and now governs Runethread licensing/commercial-model policy. The current Hosted licensing authority is [`../LICENSING.md`](../LICENSING.md). This later governance note does not rewrite the historical ADR-012 through ADR-025 architecture pin and does not itself authorize any runtime or provider resource.
+
 ## Required boundaries
 
 The hosted implementation MUST preserve at least these accepted invariants:
