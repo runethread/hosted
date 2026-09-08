@@ -65,8 +65,11 @@ For material development-pipeline/repository-policy/CI-self-protection changes a
 
 ## Licensing / commercial-model gate
 
-- [ ] No hosted runtime/Worker source is introduced, or the dedicated reviewed Runethread licensing/commercial-model decision is already recorded and linked.
-- [ ] Any license change is described prospectively and does not claim to revoke terms already granted for previously published bytes.
+- [ ] ADR-026 and `LICENSING.md` were checked; prospective Runethread-owned Hosted material remains under PolyForm Perimeter 1.0.1 unless an explicit reviewed exception applies.
+- [ ] This change does not create a prospective Hosted MIT exception or import Core's MIT interoperability boundary unless an explicit reviewed licensing decision does so.
+- [ ] Historical MIT grants remain intact; this change does not claim to revoke, narrow, or rewrite rights already granted for previously distributed bytes.
+- [ ] User-authored memories, projects, imports, attachments, and other user-owned data are not treated as Runethread-licensed software merely because Hosted processes them.
+- [ ] No material third-party Hosted source is merged without the explicit inbound-rights policy required by ADR-026 and `LICENSING.md`.
 - [ ] Commercial-use / redistribution implications were reviewed when this change affects licensing or source distribution.
 
 ## Dependency/toolchain gate
