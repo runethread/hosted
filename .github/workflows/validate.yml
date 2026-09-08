@@ -8,6 +8,44 @@ permissions:
   contents: read
 
 jobs:
+  generate-toolchain-evidence:
+    name: generate-toolchain-evidence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.20.0
+
+      - name: Generate lockfile and Worker types outside the checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/runethread-toolchain-generation"
+          out="$RUNNER_TEMP/runethread-toolchain-evidence"
+          mkdir -p "$work/src" "$out"
+          cp package.json wrangler.jsonc "$work/"
+          cp src/index.ts "$work/src/index.ts"
+          cd "$work"
+          npm install --ignore-scripts --no-audit --no-fund
+          npx wrangler types worker-configuration.d.ts
+          cp package-lock.json "$out/package-lock.json"
+          cp worker-configuration.d.ts "$out/worker-configuration.d.ts"
+
+      - name: Upload generated evidence
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: toolchain-generated-${{ github.sha }}
+          path: ${{ runner.temp }}/runethread-toolchain-evidence/
+          if-no-files-found: error
+          retention-days: 1
+
   quality:
     name: quality
     runs-on: ubuntu-latest
@@ -43,10 +81,13 @@ jobs:
   validate:
     name: validate
     if: always()
-    needs: [quality]
+    needs: [generate-toolchain-evidence, quality]
     runs-on: ubuntu-latest
     steps:
       - name: Require every validation gate
         env:
+          GENERATION_RESULT: ${{ needs.generate-toolchain-evidence.result }}
           QUALITY_RESULT: ${{ needs.quality.result }}
-        run: test "$QUALITY_RESULT" = "success"
+        run: |
+          test "$GENERATION_RESULT" = "success"
+          test "$QUALITY_RESULT" = "success"
