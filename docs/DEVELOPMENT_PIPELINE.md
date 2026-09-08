@@ -2,9 +2,9 @@
 
 Status: **Active project policy**
 
-## 1. Current bootstrap gate
+## 1. Current pre-runtime gate
 
-The initial repository bootstrap intentionally carries no Node/Cloudflare dependency graph or deployable hosted runtime. Until a separately reviewed policy extension lands, the Git-tracked repository manifest is exactly the bootstrap surface enforced by `scripts/check_development_policy.py`, and the only admitted GitHub Actions workflow is `.github/workflows/validate.yml`. Unexpected runtime/provider/toolchain files fail closed.
+The initial repository bootstrap is complete. The repository still intentionally carries no Node/Cloudflare dependency graph or deployable hosted runtime. Until a separately reviewed policy extension lands after the ADR-026 Hosted transition, the Git-tracked repository manifest is exactly the bootstrap/governance surface enforced by `scripts/check_development_policy.py`, plus the explicit licensing authority files admitted by that transition. The only admitted GitHub Actions workflow remains `.github/workflows/validate.yml`. Unexpected runtime/provider/toolchain files fail closed.
 
 Required validation is:
 
@@ -38,16 +38,19 @@ The bootstrap policy intentionally does not implement a partial YAML interpreter
 
 ## 3. Licensing/commercial-model gate
 
-The repository was initially published under MIT. That bootstrap fact is not a frozen long-term licensing decision.
+ADR-026 is the accepted project licensing/commercial-model decision. Before the first hosted runtime source or Worker shell is merged, `runethread/hosted` must complete its own protected transition:
 
-Before the first hosted runtime source or Worker shell is merged:
+- **PolyForm Perimeter 1.0.1** becomes the prospective default for Runethread-owned Hosted material to the extent the applicable licensor controls the necessary rights;
+- the exact historical Hosted MIT root license is preserved as `LICENSE-MIT`;
+- Hosted has **no prospective MIT exception** unless a later explicit reviewed decision creates one;
+- Core's exact MIT interoperability boundary does not automatically extend into Hosted;
+- user-authored memories/projects/imports/attachments/data remain outside Runethread's software-license grants;
+- material third-party source contributions require an explicit inbound-rights policy appropriate to the intended commercial model;
+- the policy guard mechanically locks the legal texts/current licensing authority and rejects stale current-MIT claims.
 
-- make a dedicated reviewed Runethread licensing/commercial-model decision;
-- compare the candidate licenses against the intended open-source/community and commercial boundaries;
-- explicitly decide how future source releases may be used commercially by third parties;
-- record the decision in the owning architecture/governance surface before relying on it.
+Code already published under MIT remains subject to those historical grants. Never describe the transition as retroactively withdrawing or narrowing previously granted rights.
 
-Code already published under a given license remains subject to that published license; a future change must not be described as retroactively changing previously granted terms.
+The licensing transition itself admits no runtime/provider/toolchain/deployment state. After it merges and is post-merge verified, proceed to the separate dependency/toolchain gate below.
 
 ## 4. Dependency/toolchain admission gate
 
@@ -99,11 +102,11 @@ Before readiness:
 5. inspect comments, reviews, and review threads;
 6. re-check base movement and provider premises;
 7. perform required backward/forward/negative/security review;
-8. for bootstrap, verify the required `main` ruleset is already active before authorizing merge.
+8. verify the required `main` ruleset remains active before authorizing merge.
 
 ## 8. Repository ruleset target
 
-As soon as this repository has a successful `validate` status check that GitHub can select, and **before bootstrap merge**, activate a ruleset equivalent to the Core safety posture:
+The protected-main ruleset established during bootstrap remains a continuing prerequisite. Before every safety-sensitive merge, live-verify a ruleset equivalent to the Core safety posture:
 
 - pull request required for `main`;
 - strict/up-to-date required `validate` check bound to the GitHub Actions expected source/App, not an unrestricted "any source" status context;
@@ -113,9 +116,9 @@ As soon as this repository has a successful `validate` status check that GitHub 
 
 At bootstrap review time, the live Core `Protect main` ruleset binds `validate` to GitHub Actions (`integration_id: 15368`). Treat the named expected source as the invariant and live-verify the current source/integration when configuring hosted rather than relying on an unverified historical ID. Read back the complete hosted ruleset, including the required-check source binding, before readiness.
 
-If GitHub cannot establish that exact protection before merge, do not merge; report the blocker and keep the bootstrap draft.
+If that exact protection is absent or weakened, do not merge; report the blocker and keep the PR draft.
 
-The current connector cannot create organization repository rulesets, so this external configuration must be configured through an authorized GitHub management surface and then live-read back before readiness.
+If a future ruleset change cannot be performed through the active connector, use an authorized GitHub management surface and then live-read back the complete result before readiness.
 
 ## 9. Merge/post-merge gate
 
