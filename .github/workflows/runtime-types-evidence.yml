@@ -1,0 +1,38 @@
+name: Generate runtime-type evidence
+
+on:
+  push:
+    branches:
+      - runethread/toolchain-worker-shell
+
+permissions:
+  contents: read
+
+jobs:
+  generate-runtime-types:
+    if: "${{ github.event.head_commit.message == 'chore: stage runtime-type evidence' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.20.0
+          package-manager-cache: false
+
+      - name: Generate and identify runtime types
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node --version)" = "v24.20.0"
+          test "$(npm --version)" = "11.19.0"
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx wrangler types worker-configuration.d.ts
+          grep -F 'declare module "cloudflare:workers"' worker-configuration.d.ts >/dev/null
+          printf 'RUNTIME_TYPES_SHA256=%s\n' "$(sha256sum worker-configuration.d.ts | awk '{print $1}')"
+          printf 'RUNTIME_TYPES_BYTES=%s\n' "$(wc -c < worker-configuration.d.ts | tr -d ' ')"
