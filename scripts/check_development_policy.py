@@ -36,9 +36,37 @@ BOOTSTRAP_WORKFLOWS = (".github/workflows/validate.yml",)
 BOOTSTRAP_WORKFLOW_SHA256 = "52119d9fe135ff770243ae375bc16aa696b765106632ae2728857ca6e477823f"
 PERIMETER_LICENSE_SHA256 = "bb1d1de338bdbe282f151bf54d6bb6ad98ad37b9592539461fb51ff4bcd4e1c3"
 HISTORICAL_MIT_LICENSE_SHA256 = "273538c6ad97c94dc4230b1b66211a1ebf2769d86fa0bc93cbe2d6670eca88bd"
-LICENSING_POLICY_SHA256 = "4e9fb83f34164b15ab9114e615b8a651c72c49cafb0a54e26d787d1825923db7"
+LICENSING_POLICY_SHA256 = "1266c20aad8a70ab2bb67dacde3c5fb07017fe26a501a3fdbc95171a69e47ccb"
+
+# Secondary licensing/governance entrypoints are exact-locked for the current
+# dependency-free pre-runtime gate. These are Git blob object IDs, used only as
+# exact byte-change tripwires; the legal texts and central licensing authority
+# above remain independently SHA-256 locked.
+LICENSING_AUTHORITY_GIT_BLOBS = {
+    "README.md": "f0585a8e46172e639c408881357acd8f934e6e00",
+    "AGENTS.md": "eadfc55c79169cdbf870deaef961eb3c6355ff24",
+    "docs/CURRENT_MILESTONE.md": "ac63f9a965ce377ff8633c8acc0e584b4953c4f4",
+    "docs/DEVELOPMENT_PIPELINE.md": "9b62d8d18b1561b9b33a685ea855ab9f8b77792b",
+    "docs/ENGINEERING_PROCESS.md": "d0d59f1427f83b2fe9b775f1097a1a5c4a8a5de3",
+    "docs/ARCHITECTURE_BASELINE.md": "5a2576b62da1843dc5c6f810e5ca7528c0530687",
+    ".github/pull_request_template.md": "785fe374920db808bd76d5ee2d63284a8cce5923",
+}
+
+LICENSING_AUTHORITY_PATHS = frozenset(
+    {"LICENSE", "LICENSE-MIT", "LICENSING.md"} | set(LICENSING_AUTHORITY_GIT_BLOBS)
+)
+LICENSING_GUARD_IMPLEMENTATION_PATHS = frozenset(
+    {"scripts/check_development_policy.py", "scripts/check_development_policy_test.py"}
+)
 
 LICENSING_REQUIRED_MARKERS = {
+    "LICENSING.md": (
+        "This repository has no prospective MIT interoperability exception of its own",
+        "fd4928859aaa0ff7105330686daa10217f2952f2",
+        "ca2282eafca03573ac9c88277125cc6973234959",
+        "User data",
+        "explicit inbound-rights policy",
+    ),
     "README.md": (
         "PolyForm Perimeter 1.0.1 as the prospective Hosted implementation default",
         "Hosted has no prospective MIT interoperability exception of its own",
@@ -65,11 +93,33 @@ LICENSING_REQUIRED_MARKERS = {
         "Hosted has no prospective MIT exception",
         "`LICENSING.md` is the current Hosted licensing authority",
     ),
+    "docs/ARCHITECTURE_BASELINE.md": (
+        "ADR-026 was accepted in `runethread/core` after this bootstrap architecture pin",
+        "[`../LICENSING.md`](../LICENSING.md)",
+        "does not rewrite the historical ADR-012 through ADR-025 architecture pin",
+    ),
+    ".github/pull_request_template.md": (
+        "ADR-026 and `LICENSING.md` were checked",
+        "PolyForm Perimeter 1.0.1",
+        "does not create a prospective Hosted MIT exception",
+        "User-authored memories, projects, imports, attachments, and other user-owned data",
+        "explicit inbound-rights policy",
+    ),
 }
 
 CURRENT_MIT_CLAIM_RE = re.compile(
     r"\b(?:runethread\s+hosted|hosted(?:\s+(?:implementation|source|material))?|this\s+repository)"
-    r"\s+(?:is|are|remains?)\s+(?:currently\s+)?(?:licensed\s+under\s+)?(?:the\s+)?MIT\b",
+    r"\s+(?:(?:is|are|remains?)\s+(?:currently\s+)?(?:licensed\s+under\s+)?(?:the\s+)?MIT\b"
+    r"|(?:is|are)\s+available\s+under\s+(?:the\s+)?MIT\b"
+    r"|(?:is|are)\s+distributed\s+under\s+(?:the\s+)?MIT\b"
+    r"|uses\s+(?:the\s+)?MIT\s+License\b)",
+    re.IGNORECASE,
+)
+
+LICENSE_VOCAB_RE = re.compile(
+    r"\b(?:MIT|PolyForm|Perimeter|licen[cs](?:e|ed|es|ing|or|ee)?|"
+    r"copyright|rightsholder|relicens\w*|source[- ]available|"
+    r"open[- ]source|commercial(?:ly)?|SPDX-License-Identifier)\b",
     re.IGNORECASE,
 )
 
@@ -88,6 +138,12 @@ TEXT_NAMES = {".gitattributes", ".gitignore", ".editorconfig", "LICENSE", "LICEN
 
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def git_blob_sha1(data: bytes) -> str:
+    """Return the Git SHA-1 object id for exact blob bytes."""
+    header = f"blob {len(data)}\0".encode("ascii")
+    return hashlib.sha1(header + data).hexdigest()
 
 
 def workflow_errors(text: str) -> list[str]:
@@ -248,6 +304,7 @@ def _read_utf8(path: Path) -> tuple[str | None, str | None]:
 
 def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
     errors: list[str] = []
+
     exact_hashes = {
         "LICENSE": PERIMETER_LICENSE_SHA256,
         "LICENSE-MIT": HISTORICAL_MIT_LICENSE_SHA256,
@@ -264,7 +321,27 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
             errors.append(f"cannot read licensing file {relative}: {exc}")
             continue
         if actual != expected:
-            errors.append(f"{relative} must match exact reviewed licensing bytes: expected sha256 {expected}, got {actual}")
+            errors.append(
+                f"{relative} must match exact reviewed licensing bytes: "
+                f"expected sha256 {expected}, got {actual}"
+            )
+
+    for relative, expected_blob in LICENSING_AUTHORITY_GIT_BLOBS.items():
+        if relative not in tracked_relatives:
+            errors.append(f"licensing authority surface missing: {relative}")
+            continue
+        path = root / relative
+        try:
+            data = path.read_bytes()
+        except OSError as exc:
+            errors.append(f"cannot read licensing authority surface {relative}: {exc}")
+            continue
+        actual_blob = git_blob_sha1(data)
+        if actual_blob != expected_blob:
+            errors.append(
+                f"{relative} must match exact reviewed governance bytes during the pre-runtime gate: "
+                f"expected git blob {expected_blob}, got {actual_blob}"
+            )
 
     for relative, markers in LICENSING_REQUIRED_MARKERS.items():
         if relative not in tracked_relatives:
@@ -279,8 +356,6 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
                 errors.append(f"{relative} missing licensing invariant marker: {marker}")
 
     for relative in sorted(tracked_relatives):
-        if relative == "LICENSE-MIT":
-            continue
         path = root / relative
         if path.suffix.lower() not in TEXT_SUFFIXES and path.name not in TEXT_NAMES:
             continue
@@ -288,8 +363,23 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
         if read_error is not None or text is None:
             errors.append(f"cannot scan licensing claims in {relative}: {read_error}")
             continue
-        if CURRENT_MIT_CLAIM_RE.search(text):
-            errors.append(f"{relative} makes a stale/current MIT claim for Hosted; historical MIT belongs only to the historical-grant context")
+
+        if relative != "LICENSE-MIT" and CURRENT_MIT_CLAIM_RE.search(text):
+            errors.append(
+                f"{relative} makes a stale/current MIT claim for Hosted; "
+                "historical MIT belongs only to the historical-grant context"
+            )
+
+        if (
+            relative not in LICENSING_AUTHORITY_PATHS
+            and relative not in LICENSING_GUARD_IMPLEMENTATION_PATHS
+            and LICENSE_VOCAB_RE.search(text)
+        ):
+            errors.append(
+                f"{relative} contains licensing/rights vocabulary outside the exact reviewed "
+                "Hosted licensing authority surfaces"
+            )
+
     return errors
 
 
@@ -298,10 +388,23 @@ def check_repository(root: Path) -> list[str]:
     project_paths, manifest_errors = tracked_regular_files(root)
     errors.extend(manifest_errors)
     tracked_relatives = {path.relative_to(root).as_posix() for path in project_paths}
+
     errors.extend(bootstrap_manifest_errors(tracked_relatives))
-    workflows = tuple(sorted(relative for relative in tracked_relatives if relative.startswith(".github/workflows/") and Path(relative).suffix.lower() in {".yml", ".yaml"}))
+
+    workflows = tuple(
+        sorted(
+            relative
+            for relative in tracked_relatives
+            if relative.startswith(".github/workflows/")
+            and Path(relative).suffix.lower() in {".yml", ".yaml"}
+        )
+    )
     if workflows != BOOTSTRAP_WORKFLOWS:
-        errors.append("bootstrap workflow manifest must be exactly " f"{BOOTSTRAP_WORKFLOWS!r}, got {workflows!r}; extend policy deliberately before adding workflows")
+        errors.append(
+            "bootstrap workflow manifest must be exactly "
+            f"{BOOTSTRAP_WORKFLOWS!r}, got {workflows!r}; extend policy deliberately before adding workflows"
+        )
+
     for relative in workflows:
         workflow = root / relative
         try:
@@ -310,10 +413,12 @@ def check_repository(root: Path) -> list[str]:
             errors.append(f"cannot read {relative}: {exc}")
             continue
         errors.extend(f"{relative}: {err}" for err in workflow_errors(text))
+
     errors.extend(package_manifest_errors(root, tracked_relatives))
     errors.extend(secret_path_errors(project_paths))
     errors.extend(crlf_errors(project_paths))
     errors.extend(licensing_errors(root, tracked_relatives))
+
     baseline = root / "docs" / "ARCHITECTURE_BASELINE.md"
     if "docs/ARCHITECTURE_BASELINE.md" in tracked_relatives:
         try:
@@ -321,10 +426,19 @@ def check_repository(root: Path) -> list[str]:
         except (OSError, UnicodeDecodeError) as exc:
             errors.append(f"cannot read architecture baseline: {exc}")
         else:
-            required = ("22995a7cf7d1c6c0f4ce548fd83667468b356f42", "ef1d3c6a4e8a783cc0657b15a61703a5fa52d6d9", "ADR-025", "non-authoritative", "runethread/core")
+            required = (
+                "22995a7cf7d1c6c0f4ce548fd83667468b356f42",
+                "ef1d3c6a4e8a783cc0657b15a61703a5fa52d6d9",
+                "ADR-025",
+                "ADR-026",
+                "non-authoritative",
+                "runethread/core",
+                "../LICENSING.md",
+            )
             for token in required:
                 if token not in text:
-                    errors.append(f"architecture baseline missing bootstrap reference token: {token}")
+                    errors.append(f"architecture baseline missing bootstrap/governance reference token: {token}")
+
     return errors
 
 
