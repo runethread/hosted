@@ -22,8 +22,9 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.20.0
+          package-manager-cache: false
 
-      - name: Generate lockfile and Worker types outside the checkout
+      - name: Generate dependency and Worker-type evidence outside the checkout
         shell: bash
         run: |
           set -euo pipefail
@@ -37,6 +38,11 @@ jobs:
           npx wrangler types --include-runtime=false worker-configuration.d.ts
           cp package-lock.json "$out/package-lock.json"
           cp worker-configuration.d.ts "$out/worker-configuration.d.ts"
+          set +e
+          npm audit --json > "$out/npm-audit.json"
+          audit_status=$?
+          set -e
+          printf '%s\n' "$audit_status" > "$out/npm-audit-exit.txt"
 
       - name: Upload generated evidence
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
