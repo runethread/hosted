@@ -6,7 +6,7 @@
     "node": "24.20.0"
   },
   "scripts": {
-    "types:check": "wrangler types --check",
+    "types:check": "wrangler types --check --include-runtime=false",
     "typecheck": "tsc --noEmit && tsc -p test/tsconfig.json --noEmit",
     "test": "vitest run",
     "check": "npm run types:check && npm run typecheck && npm test"

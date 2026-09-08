@@ -34,7 +34,7 @@ jobs:
           cp src/index.ts "$work/src/index.ts"
           cd "$work"
           npm install --ignore-scripts --no-audit --no-fund
-          npx wrangler types worker-configuration.d.ts
+          npx wrangler types --include-runtime=false worker-configuration.d.ts
           cp package-lock.json "$out/package-lock.json"
           cp worker-configuration.d.ts "$out/worker-configuration.d.ts"
 
