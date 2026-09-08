@@ -92,10 +92,16 @@ class WorkflowPolicyTests(unittest.TestCase):
     def test_any_executable_or_structural_mutation_is_rejected(self) -> None:
         mutations = {
             "mutable action": replace_once(VALID_WORKFLOW, f"actions/checkout@{CHECKOUT_SHA}", "actions/checkout@v7"),
+            "quoted uses": replace_once(VALID_WORKFLOW, "        uses: actions/checkout@", '        "uses": actions/checkout@'),
+            "unreviewed action": replace_once(VALID_WORKFLOW, "actions/checkout@", "actions/setup-node@"),
+            "local action": replace_once(VALID_WORKFLOW, f"actions/checkout@{CHECKOUT_SHA}", "./.github/actions/local"),
             "pull request target": replace_once(VALID_WORKFLOW, "  pull_request:\n", "  pull_request_target:\n"),
             "write permissions": replace_once(VALID_WORKFLOW, "permissions:\n  contents: read", "permissions:\n  contents: read\n  issues: write"),
             "persist credentials": replace_once(VALID_WORKFLOW, "persist-credentials: false", "persist-credentials: true"),
             "shallow checkout": replace_once(VALID_WORKFLOW, "fetch-depth: 0", "fetch-depth: 1"),
+            "self hosted quality": replace_once(VALID_WORKFLOW, "  quality:\n    name: quality\n    runs-on: ubuntu-latest", "  quality:\n    name: quality\n    runs-on: self-hosted"),
+            "skip whitespace": replace_once(VALID_WORKFLOW, "          set -euo pipefail\n", "          exit 0\n          set -euo pipefail\n"),
+            "skip policy tests": replace_once(VALID_WORKFLOW, "          python3 -m py_compile", "          exit 0\n          python3 -m py_compile"),
             "remove policy guard": replace_once(VALID_WORKFLOW, "      - name: Enforce development policy\n        run: python3 scripts/check_development_policy.py\n", ""),
             "weaken validate dependency": replace_once(VALID_WORKFLOW, "    needs: [quality]", "    needs: []"),
             "weaken validate result": replace_once(VALID_WORKFLOW, '        run: test "$QUALITY_RESULT" = "success"', "        run: true"),
@@ -103,6 +109,31 @@ class WorkflowPolicyTests(unittest.TestCase):
         for name, text in mutations.items():
             with self.subTest(name=name):
                 self.assertTrue(workflow_errors(text))
+
+    def test_substring_spoofing_does_not_restore_acceptance(self) -> None:
+        text = replace_once(VALID_WORKFLOW, "    needs: [quality]", "    needs: []")
+        text = replace_once(text, '        run: test "$QUALITY_RESULT" = "success"', "        run: true")
+        text = replace_once(
+            text,
+            "          set -euo pipefail\n",
+            "          set -euo pipefail\n"
+            '          echo "    needs: [quality]" >/dev/null\n'
+            "          echo 'run: test \\\"$QUALITY_RESULT\\\" = \\\"success\\\"' >/dev/null\n",
+        )
+        self.assertTrue(workflow_errors(text))
+
+    def test_command_relocation_spoofing_does_not_restore_acceptance(self) -> None:
+        text = replace_once(
+            VALID_WORKFLOW,
+            "      - name: Enforce development policy\n        run: python3 scripts/check_development_policy.py\n",
+            "",
+        )
+        text = replace_once(
+            text,
+            "      - name: Test development policy guard\n",
+            "      - name: Test development policy guard run: python3 scripts/check_development_policy.py\n",
+        )
+        self.assertTrue(workflow_errors(text))
 
 
 class PackagePolicyTests(unittest.TestCase):
@@ -113,6 +144,12 @@ class PackagePolicyTests(unittest.TestCase):
             (root / "package-lock.json").write_text("{}", encoding="utf-8")
             return package_errors(root / "package.json", root / "package-lock.json")
 
+    def test_package_requires_lockfile(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "package.json").write_text('{"private": true}', encoding="utf-8")
+            self.assertTrue(package_errors(root / "package.json", root / "package-lock.json"))
+
     def test_exact_semver_is_allowed(self) -> None:
         self.assertEqual(self._errors_for("4.129.0"), [])
         self.assertEqual(self._errors_for("4.129.0-rc.1+build.7"), [])
@@ -121,6 +158,13 @@ class PackagePolicyTests(unittest.TestCase):
         for version in ("^4.129.0", "~4.129.0", "latest", "workspace:*", "file:../x", "1", "1.2", "1.2.3-01"):
             with self.subTest(version=version):
                 self.assertTrue(self._errors_for(version))
+
+    def test_invalid_lockfile_json_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "package.json").write_text('{"private": true}', encoding="utf-8")
+            (root / "package-lock.json").write_text("{", encoding="utf-8")
+            self.assertTrue(any("package-lock.json" in error for error in package_errors(root / "package.json", root / "package-lock.json")))
 
     def test_package_and_lock_must_share_membership(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -218,7 +262,8 @@ class LicensingPolicyTests(unittest.TestCase):
             root = Path(tmp)
             tracked = self._copy_authority(root)
             path = root / "README.md"
-            path.write_text(path.read_text(encoding="utf-8") + "\nRunethread Hosted is licensed under MIT.\n", encoding="utf-8")
+            stale_claim = "Runethread Hosted is " + "licensed under " + "MIT."
+            path.write_text(path.read_text(encoding="utf-8") + "\n" + stale_claim + "\n", encoding="utf-8")
             self.assertTrue(any("stale/current MIT claim" in e for e in licensing_errors(root, tracked)))
 
     def test_missing_no_exception_marker_is_rejected(self) -> None:
