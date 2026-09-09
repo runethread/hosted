@@ -9,6 +9,8 @@ import { spawnSync } from "node:child_process";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const POLICY_PATH = join(ROOT, "release", "identity-policy.json");
+const SEMVER_2_0_0 = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+const HEX40 = /^[0-9a-f]{40}$/;
 
 function fail(message) {
   console.error(`release identity error: ${message}`);
@@ -50,6 +52,28 @@ function parseArgs(argv) {
   if (!parsed.version) fail("--version is required");
   if (!new Set(["ci", "candidate"]).has(parsed.mode)) fail(`unsupported mode ${parsed.mode}`);
   return parsed;
+}
+
+function parseReleaseIdentifier(policy, identifier) {
+  const versioning = policy.versioning;
+  if (!versioning || versioning.scheme !== "semver-2.0.0") {
+    fail("release versioning scheme must be semver-2.0.0");
+  }
+  if (versioning.release_identifier_prefix !== "v") {
+    fail("Runethread release identifier prefix must be exactly v");
+  }
+  if (!HEX40.test(versioning.authority_git_commit) || !HEX40.test(versioning.authority_git_blob)) {
+    fail("versioning authority commit/blob identities must be immutable 40-hex Git identities");
+  }
+  if (versioning.authority_repository !== "runethread/core" || versioning.authority_path !== "docs/runethread/VERSIONING.md") {
+    fail("release versioning authority must be the reviewed Core VERSIONING.md authority");
+  }
+
+  const prefix = versioning.release_identifier_prefix;
+  if (!identifier.startsWith(prefix)) fail(`release identifier must start with ${prefix}`);
+  const semver = identifier.slice(prefix.length);
+  if (!SEMVER_2_0_0.test(semver)) fail(`invalid SemVer 2.0.0 value in release identifier ${identifier}`);
+  return semver;
 }
 
 function sortedObject(object) {
@@ -147,14 +171,15 @@ function main() {
     fail(`Node ${process.version} does not match v${policy.build.node}`);
   }
 
-  const versionPattern = new RegExp(policy.release_version.format);
-  if (!versionPattern.test(args.version)) fail(`invalid version ${args.version}`);
+  const semverValue = parseReleaseIdentifier(policy, args.version);
+  const reservedSemver = parseReleaseIdentifier(policy, policy.release_version.ci_reserved);
   if (args.mode === "ci" && args.version !== policy.release_version.ci_reserved) {
     fail(`CI mode requires reserved version ${policy.release_version.ci_reserved}`);
   }
   if (args.mode === "candidate" && args.version === policy.release_version.ci_reserved) {
     fail("candidate mode cannot use the reserved CI version");
   }
+  if (reservedSemver !== "0.0.0-ci") fail("reserved CI SemVer value must remain 0.0.0-ci");
 
   const trackedStatus = git("status", "--porcelain", "--untracked-files=no");
   if (trackedStatus) fail("tracked working tree is not clean");
@@ -193,7 +218,11 @@ function main() {
   const manifest = {
     schema: 1,
     component: policy.component,
-    release_version: args.version,
+    versioning: policy.versioning,
+    release_version: {
+      identifier: args.version,
+      semver: semverValue,
+    },
     source: {
       repository: policy.source.repository,
       commit: sourceCommit,
