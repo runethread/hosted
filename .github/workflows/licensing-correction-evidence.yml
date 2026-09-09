@@ -1,0 +1,176 @@
+name: Generate licensing-correction evidence
+
+on:
+  push:
+    branches:
+      - runethread/toolchain-worker-shell
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    if: "${{ github.event.head_commit.message == 'chore: stage licensing-correction evidence' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Construct and verify complete correction set without pushing
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          curl -fsSL \
+            https://raw.githubusercontent.com/cloudflare/workerd/590f9f99475ef34fb4902a36d868e261709f7366/LICENSE \
+            -o LICENSE-APACHE-2.0
+
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          from pathlib import Path
+
+          def sha256(data: bytes) -> str:
+              return hashlib.sha256(data).hexdigest()
+
+          def replace_once(text: str, old: str, new: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected exactly one replacement target, got {count}: {old!r}")
+              return text.replace(old, new, 1)
+
+          apache = Path("LICENSE-APACHE-2.0").read_bytes()
+          if b"Apache License" not in apache or b"Version 2.0" not in apache:
+              raise SystemExit("pinned upstream Apache license text did not match expected identity markers")
+
+          notice_text = """# Third-party notices
+
+`worker-configuration.d.ts` contains generated Cloudflare Workers runtime declarations produced by Wrangler for `workerd@1.20260907.1` and compatibility date `2026-09-09`.
+
+The generated runtime declaration portion retains copyright notices for Cloudflare and Microsoft and is distributed under the Apache License 2.0. The embedded notices are preserved in `worker-configuration.d.ts`, and a copy of the Apache License 2.0 is provided in [`LICENSE-APACHE-2.0`](LICENSE-APACHE-2.0).
+
+This notice is scoped to that identified third-party material. It does not change the PolyForm Perimeter terms for Runethread-authored Hosted material, the historical MIT grants preserved in `LICENSE-MIT`, or the user-data boundary described in `LICENSING.md`.
+"""
+          Path("THIRD_PARTY_NOTICES.md").write_text(notice_text, encoding="utf-8")
+
+          licensing_path = Path("LICENSING.md")
+          licensing = licensing_path.read_text(encoding="utf-8")
+          licensing = replace_once(
+              licensing,
+              "Any post-transition Hosted source or build artifact distributed under Perimeter must provide recipients the applicable Perimeter terms or URL and every `Required Notice:` supplied with the software. Bundled Core or third-party material retains its own applicable notice obligations; satisfying those obligations does not create a prospective MIT exception for Hosted source. A Hosted release/distribution pipeline must prove the required notice material is delivered before publishing an artifact.",
+              "Any post-transition Hosted source or build artifact distributed under Perimeter must provide recipients the applicable Perimeter terms or URL and every `Required Notice:` supplied with the software. Bundled Core or third-party material retains its own applicable notice obligations; satisfying those obligations does not create a prospective MIT exception for Hosted source.\n\nThe repository currently distributes `worker-configuration.d.ts`, whose generated runtime declaration portion contains Cloudflare and Microsoft material under the Apache License 2.0. Its upstream notices remain embedded in that file. [`LICENSE-APACHE-2.0`](LICENSE-APACHE-2.0) provides recipients the Apache 2.0 license copy for that material, and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) records the scoped third-party boundary. Those files do not relicense Runethread-authored Hosted source.\n\nA future Hosted release/distribution pipeline must prove the required notice material for every actually distributed source/build surface before publishing an artifact.",
+          )
+          licensing_path.write_text(licensing, encoding="utf-8")
+
+          apache_hash = sha256(apache)
+          notice_hash = sha256(Path("THIRD_PARTY_NOTICES.md").read_bytes())
+          licensing_hash = sha256(licensing_path.read_bytes())
+
+          guard_path = Path("scripts/check_development_policy.py")
+          guard = guard_path.read_text(encoding="utf-8")
+          guard = replace_once(
+              guard,
+              '    "LICENSE",\n    "LICENSE-MIT",\n    "LICENSING.md",',
+              '    "LICENSE",\n    "LICENSE-MIT",\n    "LICENSE-APACHE-2.0",\n    "LICENSING.md",\n    "THIRD_PARTY_NOTICES.md",',
+          )
+          guard = replace_once(
+              guard,
+              'LICENSING_POLICY_SHA256 = "215b53b54af9c332f98de19a7cc50c84de568bac1ffc592bade30c106717b593"\nPACKAGE_LOCK_SHA256 = "dafea88d811a42ccb96a6b1f4cee69212732adb4f8e7b28ab4efb7997db13eb2"',
+              f'LICENSING_POLICY_SHA256 = "{licensing_hash}"\nAPACHE_2_LICENSE_SHA256 = "{apache_hash}"\nTHIRD_PARTY_NOTICES_SHA256 = "{notice_hash}"\nPACKAGE_LOCK_SHA256 = "dafea88d811a42ccb96a6b1f4cee69212732adb4f8e7b28ab4efb7997db13eb2"',
+          )
+          guard = replace_once(
+              guard,
+              'NON_AUTHORITY_LICENSE_METADATA_PATHS = frozenset({"package-lock.json", "worker-configuration.d.ts"})',
+              'NON_AUTHORITY_LICENSE_METADATA_PATHS = frozenset({"package-lock.json"})\nTHIRD_PARTY_DISTRIBUTION_PATHS = frozenset(\n    {"LICENSE-APACHE-2.0", "THIRD_PARTY_NOTICES.md", "worker-configuration.d.ts"}\n)\nNON_AUTHORITY_LICENSE_TEXT_PATHS = (\n    NON_AUTHORITY_LICENSE_METADATA_PATHS | THIRD_PARTY_DISTRIBUTION_PATHS\n)',
+          )
+          guard = replace_once(
+              guard,
+              '        "Distribution notices",\n        "every `Required Notice:`",\n        "explicit inbound-rights policy",',
+              '        "Distribution notices",\n        "LICENSE-APACHE-2.0",\n        "THIRD_PARTY_NOTICES.md",\n        "every `Required Notice:`",\n        "explicit inbound-rights policy",',
+          )
+          guard = replace_once(
+              guard,
+              '    ),\n    "README.md": (',
+              '    ),\n    "THIRD_PARTY_NOTICES.md": (\n        "worker-configuration.d.ts",\n        "workerd@1.20260907.1",\n        "Cloudflare",\n        "Microsoft",\n        "Apache License 2.0",\n        "LICENSE-APACHE-2.0",\n    ),\n    "README.md": (',
+          )
+          guard = replace_once(
+              guard,
+              '    "LICENSE",\n    "LICENSE-MIT",\n}',
+              '    "LICENSE",\n    "LICENSE-MIT",\n    "LICENSE-APACHE-2.0",\n}',
+          )
+          guard = replace_once(
+              guard,
+              '        "LICENSE": PERIMETER_LICENSE_SHA256,\n        "LICENSE-MIT": HISTORICAL_MIT_LICENSE_SHA256,\n        "LICENSING.md": LICENSING_POLICY_SHA256,',
+              '        "LICENSE": PERIMETER_LICENSE_SHA256,\n        "LICENSE-MIT": HISTORICAL_MIT_LICENSE_SHA256,\n        "LICENSE-APACHE-2.0": APACHE_2_LICENSE_SHA256,\n        "LICENSING.md": LICENSING_POLICY_SHA256,\n        "THIRD_PARTY_NOTICES.md": THIRD_PARTY_NOTICES_SHA256,',
+          )
+          comment_old = '''    # All current tracked files are intentional text. Dependency metadata and the
+    # exact-hash-locked Wrangler-generated runtime declaration may contain
+    # third-party license/rights notices. Those bytes are not Hosted licensing
+    # authority and are exempt from prose claim/vocabulary classification only;
+    # their own exact/toolchain checks remain mandatory elsewhere in this guard.'''
+          comment_new = '''    # All current tracked files are intentional text. Dependency metadata plus
+    # exact-hash-locked third-party distribution surfaces may contain third-party
+    # license/rights notices. Those bytes are not Hosted licensing authority and
+    # are exempt from prose claim/vocabulary classification only; their exact,
+    # toolchain, and third-party-license checks remain mandatory.'''
+          guard = replace_once(guard, comment_old, comment_new)
+          count = guard.count("relative not in NON_AUTHORITY_LICENSE_METADATA_PATHS")
+          if count != 2:
+              raise SystemExit(f"expected two licensing-scan classification targets, got {count}")
+          guard = guard.replace(
+              "relative not in NON_AUTHORITY_LICENSE_METADATA_PATHS",
+              "relative not in NON_AUTHORITY_LICENSE_TEXT_PATHS",
+          )
+          guard_path.write_text(guard, encoding="utf-8")
+
+          test_path = Path("scripts/check_development_policy_test.py")
+          tests = test_path.read_text(encoding="utf-8")
+          tests = replace_once(
+              tests,
+              '        for relative in ("package-lock.json", "worker-configuration.d.ts", ".github/workflows/validate.yml"):',
+              '        for relative in (\n            "package-lock.json",\n            "worker-configuration.d.ts",\n            "LICENSE-APACHE-2.0",\n            "THIRD_PARTY_NOTICES.md",\n            ".github/workflows/validate.yml",\n        ):',
+          )
+          count = tests.count('            "LICENSE",\n            "LICENSE-MIT",\n            "LICENSING.md",')
+          if count != 2:
+              raise SystemExit(f"expected two licensing fixture path lists, got {count}")
+          tests = tests.replace(
+              '            "LICENSE",\n            "LICENSE-MIT",\n            "LICENSING.md",',
+              '            "LICENSE",\n            "LICENSE-MIT",\n            "LICENSE-APACHE-2.0",\n            "LICENSING.md",\n            "THIRD_PARTY_NOTICES.md",',
+          )
+          tests = replace_once(
+              tests,
+              '    def test_current_licensing_authority_and_dependency_metadata_pass(self) -> None:\n        tracked = self._authority_paths()\n        self.assertEqual(licensing_errors(PROJECT_ROOT, tracked), [])\n        lock_text = (PROJECT_ROOT / "package-lock.json").read_text(encoding="utf-8")\n        self.assertIsNotNone(LICENSE_VOCAB_RE.search(lock_text))',
+              '    def test_current_licensing_authority_and_admitted_third_party_distribution_pass(self) -> None:\n        tracked = self._authority_paths() | {"worker-configuration.d.ts"}\n        self.assertEqual(licensing_errors(PROJECT_ROOT, tracked), [])\n        lock_text = (PROJECT_ROOT / "package-lock.json").read_text(encoding="utf-8")\n        worker_types = (PROJECT_ROOT / "worker-configuration.d.ts").read_text(encoding="utf-8")\n        self.assertIsNotNone(LICENSE_VOCAB_RE.search(lock_text))\n        self.assertIn("Licensed under the Apache License, Version 2.0", worker_types)',
+          )
+          tests = replace_once(
+              tests,
+              '    def test_unclassified_licensing_vocabulary_is_rejected_but_non_authority_metadata_is_allowed(self) -> None:',
+              '    def test_unclassified_licensing_vocabulary_is_rejected_but_admitted_third_party_text_is_allowed(self) -> None:',
+          )
+          insertion = '''\n    def test_third_party_license_copy_is_required(self) -> None:\n        with tempfile.TemporaryDirectory() as tmp:\n            root = Path(tmp)\n            tracked = self._copy_authority(root)\n            tracked.remove("LICENSE-APACHE-2.0")\n            errors = licensing_errors(root, tracked)\n            self.assertTrue(any("LICENSE-APACHE-2.0" in e for e in errors))\n'''
+          tests = replace_once(
+              tests,
+              '\n    def test_invalid_utf8_and_nul_are_rejected(self) -> None:',
+              insertion + '\n    def test_invalid_utf8_and_nul_are_rejected(self) -> None:',
+          )
+          test_path.write_text(tests, encoding="utf-8")
+          PY
+
+          git rm .github/workflows/licensing-correction-evidence.yml
+          git add LICENSE-APACHE-2.0 THIRD_PARTY_NOTICES.md LICENSING.md scripts/check_development_policy.py scripts/check_development_policy_test.py
+
+          python3 -m py_compile scripts/check_development_policy.py scripts/check_development_policy_test.py
+          python3 scripts/check_development_policy_test.py
+          python3 scripts/check_development_policy.py
+          git diff --cached --check
+
+          printf 'APACHE_SHA256=%s\n' "$(sha256sum LICENSE-APACHE-2.0 | awk '{print $1}')"
+          printf 'THIRD_PARTY_NOTICE_SHA256=%s\n' "$(sha256sum THIRD_PARTY_NOTICES.md | awk '{print $1}')"
+          printf 'LICENSING_SHA256=%s\n' "$(sha256sum LICENSING.md | awk '{print $1}')"
+          printf 'GUARD_SHA256=%s\n' "$(sha256sum scripts/check_development_policy.py | awk '{print $1}')"
+          printf 'TEST_SHA256=%s\n' "$(sha256sum scripts/check_development_policy_test.py | awk '{print $1}')"
+          printf 'FINAL_TREE=%s\n' "$(git write-tree)"
