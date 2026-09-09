@@ -1,0 +1,48 @@
+name: Release identity policy evidence runner
+
+on:
+  push:
+    branches:
+      - runethread/release-identity-baseline
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    if: "${{ github.event.head_commit.message == 'chore: run ADR-028 release policy evidence' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Execute embedded evidence program
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import textwrap
+
+          source_path = Path('.github/workflows/release-identity-policy-evidence-v2.yml')
+          lines = source_path.read_text(encoding='utf-8').splitlines()
+          start = next(i for i, line in enumerate(lines) if "python3 - <<'PY'" in line) + 1
+          end = next(i for i in range(start, len(lines)) if lines[i].strip() == 'PY')
+          code = textwrap.dedent('\n'.join(lines[start:end]))
+          code = code.replace(
+              'subprocess.check_call(["git", "rm", "--cached", TEMP_WORKFLOW])',
+              'subprocess.check_call(["git", "rm", "--cached", "--ignore-unmatch", TEMP_WORKFLOW])',
+          )
+
+          subprocess.check_call([
+              'git', 'rm', '--cached', '--ignore-unmatch',
+              '.github/workflows/release-identity-policy-evidence-v2.yml',
+              '.github/workflows/release-identity-policy-evidence-runner.yml',
+          ])
+          compile(code, '<embedded-release-policy-evidence>', 'exec')
+          exec(code, {'__name__': '__main__'})
+          PY
