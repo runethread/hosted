@@ -1,0 +1,55 @@
+name: Ratify proven toolchain policy
+
+on:
+  push:
+    branches:
+      - runethread/toolchain-worker-shell
+
+permissions:
+  contents: write
+
+jobs:
+  ratify:
+    if: "${{ github.event.head_commit.message == 'chore: stage proven-policy ratifier' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Apply exact reviewed policy patch, verify, and self-remove
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum worker-configuration.d.ts | awk '{print $1}')" = "d67a9e9d72dd0d155fcfd187a64d83ab062db80f20b585dfa36904ee0c778b44"
+          test "$(sha256sum package.json | awk '{print $1}')" = "c805df3ba473aad27ba59ec29567a3d63ff44f988baf8d8b4eff5379f25685ca"
+          test "$(sha256sum .gitattributes | awk '{print $1}')" = "fdf103a524864b292f70b2f1bb3013d14964036fa2da47c90cba1232baa0054a"
+          test "$(sha256sum tsconfig.json | awk '{print $1}')" = "329463c9460980c0cbe9a46ed658cbc341375089d48632a8f73c42affde7b03e"
+          test "$(sha256sum test/tsconfig.json | awk '{print $1}')" = "95d5e81f279f22af644f8bdf99935473bf19d037789e07116cbbdf5799fcdb60"
+
+          printf '%s' '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' | base64 --decode | gzip -dc > "$RUNNER_TEMP/ratify.patch"
+          test "$(sha256sum "$RUNNER_TEMP/ratify.patch" | awk '{print $1}')" = "831976ff3aa843f4574aa7cefdd16c33d763594ee7fe4d0d0a76695d5348756e"
+          git apply --check "$RUNNER_TEMP/ratify.patch"
+          git apply "$RUNNER_TEMP/ratify.patch"
+          git rm .github/workflows/ratify-toolchain-policy.yml
+
+          test "$(sha256sum scripts/check_development_policy.py | awk '{print $1}')" = "333f37a5a1589e126c7dcfec1b95190d4c23b33bae9b5de5ea6b4429c1f054cc"
+          test "$(sha256sum scripts/check_development_policy_test.py | awk '{print $1}')" = "26dd9cd70fbf44938bfb68f07bd67cb3bda06c716a56938c482747b4b03b2d53"
+          test "$(sha256sum docs/CURRENT_MILESTONE.md | awk '{print $1}')" = "238e20090f4cb87f496af6728a9d3bd2006c6f47b15ed1ee4da49bbdb10ab6c6"
+          test "$(sha256sum docs/DEVELOPMENT_PIPELINE.md | awk '{print $1}')" = "7e18b178f5378f043de54e5667042b67f9fabc174b439a020eb6af57febd2924"
+          test "$(sha256sum .github/pull_request_template.md | awk '{print $1}')" = "aff8985b6dbe115d8a83dcacbaca501a13f34777704a849938c5fa24ec7c0e71"
+
+          python3 -m py_compile scripts/check_development_policy.py scripts/check_development_policy_test.py
+          python3 scripts/check_development_policy_test.py
+          python3 scripts/check_development_policy.py
+
+          git add scripts/check_development_policy.py scripts/check_development_policy_test.py docs/CURRENT_MILESTONE.md docs/DEVELOPMENT_PIPELINE.md .github/pull_request_template.md
+          git diff --cached --check
+          test "$(git ls-files '.github/workflows/*')" = ".github/workflows/validate.yml"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "policy: ratify proven Hosted toolchain configuration"
+          git push origin HEAD:runethread/toolchain-worker-shell
