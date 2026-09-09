@@ -171,9 +171,9 @@ TOOLCHAIN_SURFACE_SHA256 = {
 # independently SHA-256 locked. Exact-head review is still required because a
 # PR can modify this guard and its expectations together.
 LICENSING_AUTHORITY_GIT_BLOBS = {
-    "README.md": "09a51eb6a741f535aafd2ac001afaa80142b929e",
+    "README.md": "aa872d548ec2a675def61645a3603390a092b49f",
     "AGENTS.md": "c8df303ca14b57ecc22b79d2a46f97d4db9f309a",
-    "docs/CURRENT_MILESTONE.md": "b0d4a4089e47cb658e208a03b55052b97956c1fd",
+    "docs/CURRENT_MILESTONE.md": "c45c926a60c81201e1161c873d67509c58706963",
     "docs/DEVELOPMENT_PIPELINE.md": "d72f89483478242ba11759ac61f27a1bec196dd9",
     "docs/ENGINEERING_PROCESS.md": "d794ae76136e48e5e920bcb39e5e8f5d24534e60",
     "docs/ARCHITECTURE_BASELINE.md": "5a2576b62da1843dc5c6f810e5ca7528c0530687",

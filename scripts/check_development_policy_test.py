@@ -405,10 +405,6 @@ class LicensingPolicyTests(unittest.TestCase):
         self.assertEqual(git_blob_sha1(data), "9c6b72e232be65f6405baa77ffbb7b7515ade72d")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class ReleaseIdentityPolicyTests(unittest.TestCase):
     def _copy_surfaces(self, root: Path) -> set[str]:
         tracked = {"release/identity-policy.json", "scripts/release_identity.mjs"}
@@ -467,8 +463,23 @@ class ReleaseIdentityPolicyTests(unittest.TestCase):
             'release_identifier_prefix !== "v"',
             "semver: semverValue",
             "publication_enabled !== false",
-            "--x-provision=false",
-            "--x-auto-create=false",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, text)
+
+        policy = json.loads((PROJECT_ROOT / "release/identity-policy.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            policy["build"]["wrangler_args"],
+            [
+                "deploy",
+                "--dry-run",
+                "--config",
+                "wrangler.jsonc",
+                "--x-provision=false",
+                "--x-auto-create=false",
+            ],
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
