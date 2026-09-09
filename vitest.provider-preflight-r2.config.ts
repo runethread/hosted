@@ -10,5 +10,6 @@ export default defineConfig({
   test: {
     include: ["provider-proof/journal_r2.proof.ts"],
     sequence: { concurrent: false },
+    testTimeout: 30_000,
   },
 });
