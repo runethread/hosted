@@ -4,7 +4,9 @@ import {
   HOSTED_API_BOUNDARY_VERSION,
   isTerminalOperationStatus,
   isValidOpaqueId,
+  validateOperationSelector,
   validateSubmission,
+  type AcceptedOperationReceipt,
   type PublicOperationStatus,
 } from "../src/api";
 
@@ -99,11 +101,34 @@ describe("Hosted API boundary", () => {
     }
   });
 
-  it("keeps opaque operation identifiers bounded", () => {
-    expect(isValidOpaqueId("operation_123")).toBe(true);
+  it("validates binding-scoped operation selectors before lookup", () => {
+    expect(
+      validateOperationSelector({ bindingId: "binding_1", operationId: "operation_1" }),
+    ).toEqual({
+      ok: true,
+      value: { bindingId: "binding_1", operationId: "operation_1" },
+    });
+    expect(
+      validateOperationSelector({ bindingId: "contains space", operationId: "operation_1" }),
+    ).toEqual({ ok: false, code: "invalid_binding_id" });
+    expect(
+      validateOperationSelector({ bindingId: "binding_1", operationId: "contains space" }),
+    ).toEqual({ ok: false, code: "invalid_operation_id" });
+  });
+
+  it("keeps opaque identifiers bounded", () => {
+    expect(isValidOpaqueId("principal_123")).toBe(true);
     expect(isValidOpaqueId("operation:123-abc.def")).toBe(true);
     expect(isValidOpaqueId("contains space")).toBe(false);
     expect(isValidOpaqueId("x".repeat(129))).toBe(false);
+  });
+
+  it("treats submit success as an acceptance receipt, not a current-status snapshot", () => {
+    const receipt: AcceptedOperationReceipt = {
+      operationId: "operation_1",
+      accepted: true,
+    };
+    expect(receipt).toEqual({ operationId: "operation_1", accepted: true });
   });
 
   it("distinguishes blocked live work from durable terminal outcomes", () => {
