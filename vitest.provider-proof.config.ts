@@ -8,7 +8,7 @@ export default defineConfig({
     }),
   ],
   test: {
-    include: ["test/provider_r2.test.ts"],
+    include: ["provider-proof/provider_r2.proof.ts"],
     sequence: { concurrent: false },
   },
 });
