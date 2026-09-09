@@ -52,8 +52,7 @@
       "index.js"
     ],
     "dry_run_auxiliary_paths": [
-      "README.md",
-      "index.js.map"
+      "README.md"
     ],
     "expected_deploy_artifacts": {}
   },
