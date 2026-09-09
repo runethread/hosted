@@ -2,7 +2,7 @@
 
 Cloud-hosted Runethread memory-delivery control plane for Phase 2.6.
 
-**Status:** the locked developer toolchain and fail-closed non-operational Worker shell are established. No production hosted mutation endpoint, Cloudflare deployment, Durable Object namespace, R2 bucket, GitHub App credential, publication capability, production route, or release is implemented or authorized by this repository state.
+**Status:** the locked developer toolchain, fail-closed non-operational Worker shell, non-publishing release-identity baseline, and source-only Hosted API boundary are established. No production hosted mutation endpoint, Cloudflare deployment, Durable Object namespace, R2 bucket, GitHub App credential, publication capability, production route, or release is implemented or authorized by this repository state.
 
 ## Responsibility
 
@@ -20,4 +20,4 @@ The admitted developer toolchain is exact and lockfile-based. Validation runs th
 
 ADR-026 establishes **PolyForm Perimeter 1.0.1 as the prospective Hosted implementation default**; the repository's earlier MIT grants remain historical and are preserved in [`LICENSE-MIT`](LICENSE-MIT). Hosted has no prospective MIT interoperability exception of its own. See [`LICENSING.md`](LICENSING.md).
 
-The non-publishing release-identity baseline is established in [`release/identity-policy.json`](release/identity-policy.json) and consumes the project-wide ADR-028/Core versioning authority. The next implementation gate is the authenticated transport-neutral request/status/cancel boundary plus caller/repository authorization. This repository state does not authorize release publication or production deployment.
+The non-publishing release-identity baseline is established in [`release/identity-policy.json`](release/identity-policy.json) and consumes the project-wide ADR-028/Core versioning authority. The source-only logical request/status/cancel contract and authorization/binding boundary are defined in [`docs/API_BOUNDARY.md`](docs/API_BOUNDARY.md); they do not make the Worker operational or change the release capability flags. The next implementation gate is sealed-request persistence plus the provider primitive proof needed before durable acceptance/coordinator work. This repository state does not authorize release publication or production deployment.

@@ -28,6 +28,7 @@ TRACKED_FILES = (
     ".github/pull_request_template.md",
     ".github/workflows/validate.yml",
     "docs/ARCHITECTURE_BASELINE.md",
+    "docs/API_BOUNDARY.md",
     "docs/CURRENT_MILESTONE.md",
     "docs/DEVELOPMENT_PIPELINE.md",
     "docs/ENGINEERING_PROCESS.md",
@@ -37,7 +38,9 @@ TRACKED_FILES = (
     "scripts/check_development_policy.py",
     "scripts/check_development_policy_test.py",
     "scripts/release_identity.mjs",
+    "src/api.ts",
     "src/index.ts",
+    "test/api.test.ts",
     "test/index.test.ts",
     "test/tsconfig.json",
     "tsconfig.json",
@@ -171,9 +174,9 @@ TOOLCHAIN_SURFACE_SHA256 = {
 # independently SHA-256 locked. Exact-head review is still required because a
 # PR can modify this guard and its expectations together.
 LICENSING_AUTHORITY_GIT_BLOBS = {
-    "README.md": "aa872d548ec2a675def61645a3603390a092b49f",
+    "README.md": "4f664836ed9629d04473a7d582bc7e693f57c6d0",
     "AGENTS.md": "c8df303ca14b57ecc22b79d2a46f97d4db9f309a",
-    "docs/CURRENT_MILESTONE.md": "c45c926a60c81201e1161c873d67509c58706963",
+    "docs/CURRENT_MILESTONE.md": "fe97af16b7426443b12ffbfb50f0d4ca82f92e97",
     "docs/DEVELOPMENT_PIPELINE.md": "d72f89483478242ba11759ac61f27a1bec196dd9",
     "docs/ENGINEERING_PROCESS.md": "d794ae76136e48e5e920bcb39e5e8f5d24534e60",
     "docs/ARCHITECTURE_BASELINE.md": "5a2576b62da1843dc5c6f810e5ca7528c0530687",

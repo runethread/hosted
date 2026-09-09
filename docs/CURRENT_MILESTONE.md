@@ -1,17 +1,18 @@
-# Current milestone — authenticated Hosted API boundary
+# Current milestone — sealed request persistence preflight
 
-Status: **Release-identity baseline established; auth/API is the next implementation gate**
+Status: **Source API boundary established; sealed request persistence/provider proof is the next implementation gate**
 
 ## Verified baseline
 
-The protected Hosted baseline now has two deliberately bounded implementation layers before any user-facing authority:
+The protected Hosted baseline now has three deliberately bounded layers before any user-facing mutation authority:
 
-1. a reproducibly locked TypeScript/Cloudflare developer toolchain plus fail-closed non-operational Worker shell; and
-2. a non-publishing release-identity/compatibility baseline that binds exact source/build/runtime inputs to a deterministic release-instance manifest.
+1. a reproducibly locked TypeScript/Cloudflare developer toolchain plus fail-closed non-operational Worker shell;
+2. a non-publishing release-identity/compatibility baseline that binds exact source/build/runtime inputs to a deterministic release-instance manifest; and
+3. a source-only transport-neutral request/status/cancel contract plus caller/repository authorization and binding abstractions in `docs/API_BOUNDARY.md` / `src/api.ts`.
 
 The admitted developer/runtime-tool identities remain Node `24.20.0`, npm `11.19.0`, Wrangler `4.129.1`, TypeScript `5.8.3`, Vitest `4.1.11`, and `@cloudflare/vitest-plugin` `1.1.5`. `package.json` is non-publishable and the lockfile remains exact.
 
-The Worker shell still returns HTTP 503 / `not_operational` and has no provider binding, route, secret, persistence, authentication, mutation authority, publication authority, deploy script, production resource, or user traffic.
+The Worker shell still returns HTTP 503 / `not_operational` and has no provider binding, route, secret, persistence, authentication implementation, mutation authority, publication authority, deploy script, production resource, or user traffic.
 
 ## Release identity baseline
 
@@ -44,32 +45,55 @@ CI uses release identifier `v0.0.0-ci` / SemVer value `0.0.0-ci` only as a reser
 
 A generated manifest binds and records the identities it contains and proves the locally verified source/build/artifact relationships. It does not independently prove external Core/provider facts or live GitHub branch protection/status-check state. Any future publication mechanism must separately prove that the source commit is the intended current protected `main` and that required `validate` evidence belongs to that exact commit.
 
+## Source API boundary baseline
+
+`docs/API_BOUNDARY.md` and `src/api.ts` define the source-level logical boundary without making it executable at the Worker edge.
+
+The boundary currently establishes:
+
+- exact Core mutation-request bytes remain opaque to Hosted semantic interpretation and are preserved byte-for-byte after bounded transport validation;
+- authenticated transport adapters resolve provider-specific credentials/claims to an opaque canonical Runethread principal identity before entering the boundary;
+- authorization is action-scoped to an opaque repository binding;
+- `status` / `cancel` are binding-scoped and require authorization before operation lookup;
+- repository binding identity includes immutable repository/App-installation/binding-epoch/full-canonical-ref information while live privacy/access/ref eligibility remains a separately revalidated provider/control-plane condition;
+- submit success is a durable acceptance receipt, not a current-state snapshot;
+- exact resubmission maps to the same hosted operation while recoverable without replacing Core semantic idempotency;
+- public status remains a bounded projection and terminal cancellation cannot be claimed before the accepted rollback-independent terminalization barriers.
+
+`HOSTED_API_BOUNDARY_VERSION = 1` is a source-contract identity only. The release compatibility policy correctly continues to mark `hosted_api` as `not_implemented` and `authenticated_api`, `repository_binding`, and `durable_state` as false because no executable authenticated edge, repository-binding store, or durable coordinator exists yet.
+
 ## Applicable Runethread invariants
 
 Hosted continues to consume, without copying, the canonical Core invariant authority. The directly relevant active IDs remain:
 
 - `RT-ARCH-001` — provider-specific execution and dependencies stay outside Core;
 - `RT-ARCH-002` — correctness-relevant component coupling uses explicit contracts or immutable identities rather than hidden internals;
+- `RT-DATA-001` — the user-owned Git repository remains canonical semantic state while Hosted operational state is non-semantic control-plane state;
 - `RT-GOV-001` — material choices are objective/evidence-driven and simpler alternatives are considered;
-- `RT-REL-001` — Hosted now has a concrete immutable compatibility/release-identity baseline for the components and policies it actually relies on;
+- `RT-REL-001` — Hosted binds correctness-relevant release/runtime/component identities explicitly rather than using floating development authority;
 - `RT-SEM-001` — Hosted does not become a second memory-mutation semantics implementation.
 
 Node/TypeScript/Wrangler/Cloudflare choices remain current Hosted implementation decisions, not project invariants. ADR-028 is project-wide release governance, not a new invariant and not a reason to collapse independent compatibility dimensions.
 
 ADR-026 remains the licensing authority for this work: Hosted has no prospective MIT exception, Core's exact MIT interoperability boundary does not automatically extend into Hosted, historical grants remain intact, and user-owned data remains outside Runethread's software-license grants.
 
-## Immediate milestone — authenticated transport-neutral API boundary
+## Immediate milestone — sealed request persistence/provider proof
 
-The next implementation slice may introduce the transport-neutral request/status/cancel boundary and caller/repository authorization required by the accepted Phase 2.6 architecture, but only inside the authority limits already frozen in Core.
+The next implementation slice is the smallest storage/admission prerequisite that materially advances Phase 2.6 without pretending durable acceptance exists early.
 
-That work must not:
+It should:
 
-- implement canonical memory mutation semantics outside Core;
-- create publication authority as a side effect of API work;
-- skip private-repository eligibility/binding checks;
-- convert the non-operational shell into an implicitly deployed service;
-- invent protocol identities without adding them to the release compatibility baseline under review;
-- weaken the existing release identity, versioning, licensing, invariant, or protected-main gates.
+- define the private sealed-request persistence boundary owned by Hosted while preserving exact request bytes, cryptographic digest, bounded size/type metadata, opaque references, and create-if-absent/no-overwrite behavior;
+- keep plaintext private request content out of ordinary coordinator metadata, logs, and public status;
+- perform the authoritative provider preflight required for the exact object-store primitives relied on by that boundary rather than inferring correctness from local mocks or documentation alone;
+- preserve role separation so public admission cannot gain generic evidence/journal/publication write authority merely because it can create its exact sealed request object;
+- keep the Worker non-operational until the later Durable Object state/alarm plus ADR-019/024 rollback-independent acceptance requirements are implemented and proven.
+
+A stored sealed request by itself is **not** durable `ACCEPTED`. The API must not expose an `AcceptedOperationReceipt` to real callers until the complete acceptance barrier required by ADR-014/019 is present.
+
+Journal-specific complete-tail/listing, Durable Object SQLite/PITR/recovery, and publication/quiescence provider proofs remain mandatory before the later components that depend on them. They do not need to be pulled into this storage slice merely to make it look more complete.
+
+Operational OAuth/service authentication, real GitHub App registration/tokens, live repository onboarding/adoption, publication, and production deployment remain later reviewed gates. The source API contract does not authorize them.
 
 ## Dependency/distribution classification
 
@@ -79,9 +103,10 @@ Future dependency work must classify each relevant dependency as development-onl
 
 ## Next gates
 
-1. authenticated transport-neutral request/status/cancel boundary and caller/repository authorization;
-2. sealed request persistence and the accepted ADR-014 through ADR-025 coordinator/evidence/publication sequence;
-3. private-repository rollout/recovery/security exit criteria;
-4. only then Phase 3 MCP integration work.
+1. sealed request persistence boundary plus exact provider primitive proof required by that boundary;
+2. repository Durable Object SQLite lane/queue/phase-generation/alarms plus ADR-019/ADR-024 acceptance journal and destructive-recovery barrier after the required provider proofs;
+3. role-scoped evidence, rollback-durable terminalization, deterministic Core candidate/finalizer/auditor verification, and exact publication/reconciliation work in the detailed order tracked by `runethread/core#20`;
+4. private-repository rollout/recovery/security exit criteria;
+5. only then Phase 3 MCP integration work.
 
-Do not turn the release-identity baseline into release publication or production deployment implicitly.
+Do not turn the source API boundary, release-identity baseline, or storage preflight into release publication or production deployment implicitly.
