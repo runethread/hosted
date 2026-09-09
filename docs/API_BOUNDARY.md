@@ -19,16 +19,25 @@ Later sealing, finalization, and audit bind the exact preserved bytes by digest 
 The source boundary exposes three logical operations:
 
 - `submit` — submit exact Core mutation-request bytes for an authorized repository binding;
-- `status` — read the bounded public status of one Hosted operation;
-- `cancel` — attempt cancellation and return the authoritative current public operation status.
+- `status` — read the bounded public status of one Hosted operation within an authorized repository binding;
+- `cancel` — attempt cancellation of one Hosted operation within an authorized repository binding and return its authoritative current public status.
 
-Concrete HTTP paths, methods, headers, OAuth flows, MCP mapping, and provider-specific authentication are not frozen by this source boundary. A later adapter may map those transports onto the same logical contract without changing memory semantics.
+Concrete HTTP paths, methods, headers, media types, OAuth flows, MCP mapping, and provider-specific authentication are not frozen by this source boundary. A later adapter may map those transports onto the same logical contract without changing memory semantics.
 
 ## 3. Authentication and authorization separation
 
-A transport adapter authenticates a caller and supplies an `AuthenticatedPrincipal` to the boundary. The boundary does not define bearer-token syntax, GitHub user-token syntax, or any other credential format.
+A transport adapter authenticates a caller and resolves the credential/provider-specific identity into an opaque canonical Runethread `principalId` before entering this boundary. Raw external subject claims are not treated as globally unique authorization identities merely because two providers use a field named `sub` or `subject`; any provider/issuer namespace binding belongs to the trusted authentication adapter.
+
+The boundary does not define bearer-token syntax, GitHub user-token syntax, OAuth/OIDC claim layout, or any other credential format.
 
 Authorization is action-scoped (`submit`, `status`, `cancel`) and targets an opaque Hosted repository binding ID. Supplying, guessing, or learning a GitHub repository ID is never sufficient authorization.
+
+`status` and `cancel` are binding-scoped commands: they carry both `bindingId` and `operationId`. A future operational implementation must preserve this order:
+
+1. validate the bounded opaque binding/operation selectors;
+2. authorize the authenticated principal for the requested action on the binding;
+3. only after authorization succeeds, look up the operation inside that exact authorized binding/binding epoch;
+4. map missing and cross-binding operation lookups without revealing whether an operation exists elsewhere.
 
 The internal authorized binding identity may bind the opaque selector to:
 
@@ -37,9 +46,11 @@ The internal authorized binding identity may bind the opaque selector to:
 - repository-binding epoch;
 - explicit canonical branch ref.
 
-Provider code remains responsible for the direct App-installation/access and private-visibility checks required by ADR-014/017. The public command does not get to choose or silently rewrite those identities.
+The canonical ref is stored as one normalized full Git branch ref such as `refs/heads/main`, not as a mutable default-branch pointer or an adapter-specific shorthand. Provider/onboarding code owns normalization and must not silently follow a later default-branch change.
 
-## 4. Submission validation
+A successful caller-authorization decision means only that the principal may address that binding for the requested action. It is not, by itself, proof that current App installation/access, repository privacy, canonical-ref health, or publication eligibility remains valid. Provider/control-plane code remains responsible for the direct current checks required by ADR-014/017 at their owning admission/finalization/publication gates. The public command does not get to choose or silently rewrite those identities.
+
+## 4. Boundary validation
 
 `validateSubmission` is deliberately transport-only. It checks:
 
@@ -53,13 +64,19 @@ It does **not** inspect mutation operation names, target IDs, memory fields, exp
 
 The returned validated bytes are copied byte-for-byte. JSON whitespace, key order, and other byte distinctions are not normalized away at this layer.
 
-## 5. Durable acceptance boundary
+`validateOperationSelector` checks only the bounded safe representation of the binding and operation IDs used by `status`/`cancel`. It does not perform authorization or operation lookup; those remain separate ordered steps so syntax validation never becomes evidence that a repository or operation exists.
 
-A successful live `submit` response is intentionally named `AcceptedOperation` because `accepted` is a durability promise, not merely an HTTP acknowledgement.
+## 5. Durable acceptance and exact resubmission
 
-A future operational implementation MUST NOT return that result until all acceptance prerequisites in the accepted Phase 2.6 architecture are satisfied. In particular, the exact sealed request reference/digest and operation metadata must be durably recoverable, required wakeup/alarm state must be established, and rollback-independent acceptance evidence must exist before client-visible durable `accepted` is returned.
+A successful live `submit` response is an `AcceptedOperationReceipt`. `accepted: true` is a historical durability receipt, not a claim that the operation's **current** state is still `accepted`; callers use `status` for the current state.
 
-Until the persistence/coordinator gate implements those prerequisites, the Worker remains non-operational and cannot return `AcceptedOperation` to real callers.
+A future operational implementation MUST NOT return that receipt until all acceptance prerequisites in the accepted Phase 2.6 architecture are satisfied. In particular, the exact sealed request reference/digest and operation metadata must be durably recoverable, required wakeup/alarm state must be established, and rollback-independent acceptance evidence must exist before client-visible durable acceptance is returned.
+
+Exact resubmission of the same preserved request bytes under the same resolved repository binding epoch must map back to the same hosted operation identity while that attempt remains recoverable. It must not create a second hosted attempt merely because the first response was lost or the operation has since advanced. The receipt may therefore be replayed with the same `operationId`; the caller obtains the current state through `status`.
+
+Byte-different request envelopes do not alias the same hosted attempt merely because Core may later observe the same Core idempotency key. Hosted exact-byte attempt identity and Core semantic idempotency remain distinct, as required by ADR-014. The exact digest/key construction belongs to the sealed-persistence gate rather than this source-only contract.
+
+Until the persistence/coordinator gate implements those prerequisites, the Worker remains non-operational and cannot return an `AcceptedOperationReceipt` to real callers.
 
 ## 6. Public status model
 
@@ -103,7 +120,7 @@ Public status and validation results must remain bounded. They do not expose:
 - internal provider request/response payloads;
 - unrestricted exception, stack, or log text.
 
-Authorization failure must not turn repository or operation identifiers into an enumeration oracle. Concrete transport error mapping is deferred to the authentication/edge implementation, but it must preserve that non-disclosure property.
+Authorization failure must not turn repository or operation identifiers into an enumeration oracle. The binding-first authorization/lookup order above is part of that guarantee. Concrete transport error mapping is deferred to the authentication/edge implementation, but it must preserve the same non-disclosure property.
 
 ## 9. Compatibility and release identity
 
