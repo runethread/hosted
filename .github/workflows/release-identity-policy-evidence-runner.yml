@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   evidence:
-    if: "${{ github.event.head_commit.message == 'chore: run ADR-028 release policy evidence' }}"
+    if: "${{ github.event.head_commit.message == 'chore: rerun ADR-028 release policy evidence' }}"
     runs-on: ubuntu-latest
     steps:
       - name: Check out branch
@@ -26,13 +26,13 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
-          import textwrap
 
           source_path = Path('.github/workflows/release-identity-policy-evidence-v2.yml')
           lines = source_path.read_text(encoding='utf-8').splitlines()
           start = next(i for i, line in enumerate(lines) if "python3 - <<'PY'" in line) + 1
           end = next(i for i in range(start, len(lines)) if lines[i].strip() == 'PY')
-          code = textwrap.dedent('\n'.join(lines[start:end]))
+          prefix = ' ' * 10
+          code = '\n'.join(line[len(prefix):] if line.startswith(prefix) else line for line in lines[start:end])
           code = code.replace(
               'subprocess.check_call(["git", "rm", "--cached", TEMP_WORKFLOW])',
               'subprocess.check_call(["git", "rm", "--cached", "--ignore-unmatch", TEMP_WORKFLOW])',
