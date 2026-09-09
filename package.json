@@ -10,8 +10,8 @@
     "types:check": "wrangler types --check",
     "typecheck": "tsc --noEmit && tsc -p test/tsconfig.json --noEmit",
     "test": "vitest run",
-    "release:probe": "node scripts/release_identity.mjs --mode ci --version v0.0.0-ci --probe",
-    "check": "npm run types:check && npm run typecheck && npm test && npm run release:probe"
+    "release:verify-ci": "node scripts/release_identity.mjs --mode ci --version v0.0.0-ci",
+    "check": "npm run types:check && npm run typecheck && npm test && npm run release:verify-ci"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "1.1.5",
