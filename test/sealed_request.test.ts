@@ -17,6 +17,7 @@ import {
 
 const encoder = new TextEncoder();
 const BINDING = { githubRepositoryId: "1358994027", bindingEpoch: "epoch_01" } as const;
+const LIMITS = { maxCoreRequestBytes: 1024 } as const;
 
 class MemorySealedRequestStore implements SealedRequestObjectStore {
   object: StoredSealedRequestObject | null = null;
@@ -43,7 +44,7 @@ class MemorySealedRequestStore implements SealedRequestObjectStore {
 describe("sealed request protocol", () => {
   it("derives a deterministic repository/epoch scoped identity over exact bytes", async () => {
     const bytes = encoder.encode('{"x":1}');
-    const planned = await planSealedRequest(BINDING, bytes);
+    const planned = await planSealedRequest(BINDING, bytes, LIMITS);
 
     expect(planned.sha256Hex).toBe(
       "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
@@ -74,18 +75,35 @@ describe("sealed request protocol", () => {
 
   it("rejects malformed storage scope and digest identifiers", async () => {
     await expect(
-      planSealedRequest({ githubRepositoryId: "repo-name", bindingEpoch: "epoch_1" }, encoder.encode("{}")),
+      planSealedRequest(
+        { githubRepositoryId: "repo-name", bindingEpoch: "epoch_1" },
+        encoder.encode("{}"),
+        LIMITS,
+      ),
     ).rejects.toThrow(RangeError);
     await expect(
-      planSealedRequest({ githubRepositoryId: "123", bindingEpoch: "contains space" }, encoder.encode("{}")),
+      planSealedRequest(
+        { githubRepositoryId: "123", bindingEpoch: "contains space" },
+        encoder.encode("{}"),
+        LIMITS,
+      ),
     ).rejects.toThrow(RangeError);
-    await expect(planSealedRequest(BINDING, new Uint8Array())).rejects.toThrow(RangeError);
+    await expect(planSealedRequest(BINDING, new Uint8Array(), LIMITS)).rejects.toThrow(RangeError);
     expect(() => sealedRequestKey(BINDING, "A".repeat(64))).toThrow(RangeError);
+  });
+
+  it("enforces the configured request-size bound independently", async () => {
+    await expect(
+      planSealedRequest(BINDING, encoder.encode('{"x":1}'), { maxCoreRequestBytes: 6 }),
+    ).rejects.toThrow(RangeError);
+    await expect(
+      planSealedRequest(BINDING, encoder.encode("{}"), { maxCoreRequestBytes: 0 }),
+    ).rejects.toThrow(RangeError);
   });
 
   it("creates then re-reads and proves exact immutable storage", async () => {
     const store = new MemorySealedRequestStore();
-    const proof = await persistSealedRequest(store, BINDING, encoder.encode('{"x":1}'));
+    const proof = await persistSealedRequest(store, BINDING, encoder.encode('{"x":1}'), LIMITS);
 
     expect(proof.disposition).toBe("created");
     expect(proof.reference.sha256).toBe(
@@ -95,12 +113,12 @@ describe("sealed request protocol", () => {
 
   it("treats an exact pre-existing object as idempotent success", async () => {
     const bytes = encoder.encode('{"x":1}');
-    const planned = await planSealedRequest(BINDING, bytes);
+    const planned = await planSealedRequest(BINDING, bytes, LIMITS);
     const store = new MemorySealedRequestStore();
     store.createResult = "already_exists";
     store.object = storedFromPlan(planned);
 
-    const proof = await persistSealedRequest(store, BINDING, bytes);
+    const proof = await persistSealedRequest(store, BINDING, bytes, LIMITS);
     expect(proof.disposition).toBe("existing_identical");
     expect(proof.reference).toEqual(planned.reference);
   });
@@ -110,7 +128,7 @@ describe("sealed request protocol", () => {
     store.createError = new Error("simulated lost response");
     store.storeBeforeCreateError = true;
 
-    const proof = await persistSealedRequest(store, BINDING, encoder.encode('{"x":1}'));
+    const proof = await persistSealedRequest(store, BINDING, encoder.encode('{"x":1}'), LIMITS);
     expect(proof.disposition).toBe("recovered_after_ambiguous_write");
   });
 
@@ -119,7 +137,7 @@ describe("sealed request protocol", () => {
     store.createError = new Error("simulated unavailable write");
 
     await expect(
-      persistSealedRequest(store, BINDING, encoder.encode('{"x":1}')),
+      persistSealedRequest(store, BINDING, encoder.encode('{"x":1}'), LIMITS),
     ).rejects.toBeInstanceOf(SealedRequestStorageUnprovenError);
   });
 
@@ -128,13 +146,13 @@ describe("sealed request protocol", () => {
     store.readError = new Error("simulated unavailable read");
 
     await expect(
-      persistSealedRequest(store, BINDING, encoder.encode('{"x":1}')),
+      persistSealedRequest(store, BINDING, encoder.encode('{"x":1}'), LIMITS),
     ).rejects.toBeInstanceOf(SealedRequestStorageUnprovenError);
   });
 
   it("rejects byte-different content at the deterministic identity", async () => {
     const bytes = encoder.encode('{"x":1}');
-    const planned = await planSealedRequest(BINDING, bytes);
+    const planned = await planSealedRequest(BINDING, bytes, LIMITS);
     const store = new MemorySealedRequestStore();
     store.createResult = "already_exists";
     store.object = {
@@ -142,14 +160,14 @@ describe("sealed request protocol", () => {
       bytes: encoder.encode('{"x":2}'),
     };
 
-    await expect(persistSealedRequest(store, BINDING, bytes)).rejects.toBeInstanceOf(
+    await expect(persistSealedRequest(store, BINDING, bytes, LIMITS)).rejects.toBeInstanceOf(
       SealedRequestIntegrityError,
     );
   });
 
   it("rejects scope metadata or provider checksum drift", async () => {
     const bytes = encoder.encode('{"x":1}');
-    const planned = await planSealedRequest(BINDING, bytes);
+    const planned = await planSealedRequest(BINDING, bytes, LIMITS);
 
     const metadataStore = new MemorySealedRequestStore();
     metadataStore.createResult = "already_exists";
@@ -157,16 +175,16 @@ describe("sealed request protocol", () => {
       ...storedFromPlan(planned),
       customMetadata: { ...planned.customMetadata, "rt-binding-epoch": "epoch_02" },
     };
-    await expect(persistSealedRequest(metadataStore, BINDING, bytes)).rejects.toBeInstanceOf(
-      SealedRequestIntegrityError,
-    );
+    await expect(
+      persistSealedRequest(metadataStore, BINDING, bytes, LIMITS),
+    ).rejects.toBeInstanceOf(SealedRequestIntegrityError);
 
     const checksumStore = new MemorySealedRequestStore();
     checksumStore.createResult = "already_exists";
     checksumStore.object = { ...storedFromPlan(planned), providerSha256Hex: null };
-    await expect(persistSealedRequest(checksumStore, BINDING, bytes)).rejects.toBeInstanceOf(
-      SealedRequestIntegrityError,
-    );
+    await expect(
+      persistSealedRequest(checksumStore, BINDING, bytes, LIMITS),
+    ).rejects.toBeInstanceOf(SealedRequestIntegrityError);
   });
 });
 
@@ -176,7 +194,7 @@ describe("R2 sealed request adapter", () => {
     const get = vi.fn();
     const bucket = { put, get } as unknown as R2Bucket;
     const store = new R2SealedRequestObjectStore(bucket);
-    const planned = await planSealedRequest(BINDING, encoder.encode('{"x":1}'));
+    const planned = await planSealedRequest(BINDING, encoder.encode('{"x":1}'), LIMITS);
 
     await expect(
       store.createIfAbsent({
@@ -204,7 +222,7 @@ describe("R2 sealed request adapter", () => {
       get: vi.fn(),
     } as unknown as R2Bucket;
     const store = new R2SealedRequestObjectStore(bucket);
-    const planned = await planSealedRequest(BINDING, encoder.encode("{}"));
+    const planned = await planSealedRequest(BINDING, encoder.encode("{}"), LIMITS);
 
     await expect(
       store.createIfAbsent({
@@ -217,7 +235,7 @@ describe("R2 sealed request adapter", () => {
   });
 
   it("maps exact R2 body, metadata, size, and provider checksum on read", async () => {
-    const planned = await planSealedRequest(BINDING, encoder.encode('{"x":1}'));
+    const planned = await planSealedRequest(BINDING, encoder.encode('{"x":1}'), LIMITS);
     const object = {
       key: planned.key,
       size: planned.size,
