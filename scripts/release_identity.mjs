@@ -39,13 +39,12 @@ function git(...args) {
 }
 
 function parseArgs(argv) {
-  const parsed = { mode: "ci", version: null, output: null, probe: false };
+  const parsed = { mode: "ci", version: null, output: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--mode") parsed.mode = argv[++i];
     else if (arg === "--version") parsed.version = argv[++i];
     else if (arg === "--output") parsed.output = argv[++i];
-    else if (arg === "--probe") parsed.probe = true;
     else fail(`unknown argument ${arg}`);
   }
   if (!parsed.version) fail("--version is required");
@@ -153,6 +152,9 @@ function main() {
   if (args.mode === "ci" && args.version !== policy.release_version.ci_reserved) {
     fail(`CI mode requires reserved version ${policy.release_version.ci_reserved}`);
   }
+  if (args.mode === "candidate" && args.version === policy.release_version.ci_reserved) {
+    fail("candidate mode cannot use the reserved CI version");
+  }
 
   const trackedStatus = git("status", "--porcelain", "--untracked-files=no");
   if (trackedStatus) fail("tracked working tree is not clean");
@@ -184,7 +186,7 @@ function main() {
   if (!Object.keys(first).length) fail("dry-run build produced no deploy artifacts");
 
   const expected = sortedObject(policy.build.expected_deploy_artifacts);
-  if (!args.probe && JSON.stringify(first) !== JSON.stringify(expected)) {
+  if (JSON.stringify(first) !== JSON.stringify(expected)) {
     fail(`deploy artifact identity mismatch: ${JSON.stringify({ expected, actual: first })}`);
   }
 
@@ -217,13 +219,7 @@ function main() {
 
   const manifestText = `${JSON.stringify(manifest, null, 2)}\n`;
   if (args.output) writeFileSync(resolve(ROOT, args.output), manifestText, "utf8");
-  if (args.probe) {
-    console.log(`release_probe_deploy_artifacts=${JSON.stringify(first)}`);
-    console.log(`release_probe_deploy_artifact_set_sha256=${manifest.build.deploy_artifact_set_sha256}`);
-    console.log(`release_probe_auxiliary_paths=${JSON.stringify([...policy.build.dry_run_auxiliary_paths].sort())}`);
-  } else {
-    console.log(`release_identity_sha256=${sha256(Buffer.from(manifestText))}`);
-  }
+  console.log(`release_identity_sha256=${sha256(Buffer.from(manifestText))}`);
 
   const finalTrackedStatus = git("status", "--porcelain", "--untracked-files=no");
   if (finalTrackedStatus) fail("release verification changed tracked source");
