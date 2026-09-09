@@ -46,11 +46,13 @@ The policy intentionally hashes the complete reviewed workflow rather than imple
 
 **Self-protection limitation:** the required workflow and the guard/digest/tests that define its expected shape are PR-controlled. A same-PR change can alter both. Green CI therefore cannot attest to its own integrity for a workflow/guard/policy change; canonical exact-head patch inspection, adversarial review, and live ruleset verification remain mandatory.
 
-## 3. Invariant impact gate
+## 3. Invariant and versioning-authority gate
 
 Before a substantive Hosted change, live-fetch the current protected `runethread/core/RUNETHREAD_INVARIANTS.json`, record the exact Core authority commit, and classify the impact on every applicable invariant ID.
 
 Hosted consumes the canonical registry; it does not maintain a competing copy. Scope means applicability, not proof strength: Core CI does not mechanically prove Hosted source, so Hosted must provide its own local evidence where useful.
+
+When a change affects component version/release identity, also live-fetch the current accepted Core ADR-028 and `docs/runethread/VERSIONING.md`. Hosted must consume that project-wide authority rather than restating a competing versioning policy locally. The exact versioning-authority Core commit/blob relied on by a release baseline is an immutable release-policy input.
 
 Provider/toolchain choices are implementation decisions unless a separately reviewed Core governance change promotes a deeper durable truth. Routine changes should not manufacture new invariants merely because the registry exists.
 
@@ -77,12 +79,15 @@ For dependency changes:
 
 Before auth/API code starts, Hosted MUST maintain the reviewed non-publishing release-identity baseline in `release/identity-policy.json` and `scripts/release_identity.mjs`.
 
-The static policy records the immutable compatibility inputs that a release instance may rely on. The generated release-instance manifest records the exact source commit/tree and explicit Hosted version supplied at verification time, avoiding a circular attempt to embed a commit's own SHA inside committed policy bytes.
+The static policy records the immutable compatibility inputs that a release instance may rely on. The generated release-instance manifest records the exact source commit/tree and explicit Hosted release identity supplied at verification time, avoiding a circular attempt to embed a commit's own SHA inside committed policy bytes.
+
+ADR-028 / Core `docs/runethread/VERSIONING.md` governs component version meaning. Hosted has an independent Semantic Versioning 2.0.0 release line. Release tooling MUST treat the raw SemVer value and the Runethread public identifier as distinct values: raw `0.3.0` corresponds to public identifier/tag `v0.3.0`. Matching numeric component versions never imply compatibility.
 
 The baseline MUST bind and verify:
 
 - exact Hosted source commit/tree in the generated manifest;
-- explicit semver input, with `v0.0.0-ci` reserved only for CI proof;
+- exact Core versioning-authority commit/blob, SemVer 2.0.0 scheme, and Runethread `v` public-identifier prefix;
+- explicit Hosted release identifier plus its strictly parsed raw SemVer value, with `v0.0.0-ci` / `0.0.0-ci` reserved only for CI proof;
 - immutable Core runtime release/tag commit rather than Core `main`;
 - contract/repository/schema/index/trust/bootstrap compatibility identities actually relied on;
 - exact Node/npm/Wrangler, package-lock, Worker compatibility date/flags, Wrangler configuration, and generated runtime-type identities;
@@ -95,7 +100,7 @@ The current build path executes the lockfile-installed Wrangler CLI directly thr
 
 The release verifier is a **builder/verifier only**. `publication_enabled` remains false. It creates no tag, GitHub Release, Cloudflare version, route, binding, resource, credential, or deployment.
 
-A generated release-instance manifest is evidence about its recorded source/build/component identities. It is not evidence that GitHub branch/ruleset/status-check state was live and acceptable at publication time. A future publication mechanism must independently prove the candidate is the intended current protected `main` commit and that required `validate` belongs to that exact commit before publication.
+A generated release-instance manifest is evidence about its recorded source/build/component/version-policy identities. It is not evidence that GitHub branch/ruleset/status-check state was live and acceptable at publication time. A future publication mechanism must independently prove the candidate is the intended current protected `main` commit and that required `validate` belongs to that exact commit before publication.
 
 Protocol/capability identities must not be invented before the corresponding component exists and is reviewed. When later Phase 2.6 slices add an API, repository runtime, journal/evidence protocol, candidate envelope, verification role, terminalization, publication, or reconciliation behavior, this compatibility baseline must advance in the same owning change or fail closed.
 
@@ -116,7 +121,7 @@ Before readiness:
 3. confirm scope/classification and invariant impact for every material surface;
 4. require exact-head `validate` success;
 5. inspect comments, reviews, and review threads;
-6. re-check base movement and time-sensitive provider premises;
+6. re-check base movement and time-sensitive provider/versioning premises;
 7. perform the required complete adversarial review, enumerating all material findings before corrections;
 8. if the head changes, restart the full review from scratch;
 9. verify the required `main` ruleset remains active before authorizing merge.
