@@ -93,7 +93,13 @@ class ManifestPolicyTests(unittest.TestCase):
                 self.assertTrue(any("unexpected tracked file" in e for e in tracked_manifest_errors(tracked)))
 
     def test_missing_required_surface_is_rejected(self) -> None:
-        for relative in ("package-lock.json", "worker-configuration.d.ts", ".github/workflows/validate.yml"):
+        for relative in (
+            "package-lock.json",
+            "worker-configuration.d.ts",
+            "LICENSE-APACHE-2.0",
+            "THIRD_PARTY_NOTICES.md",
+            ".github/workflows/validate.yml",
+        ):
             with self.subTest(relative=relative):
                 self.assertTrue(tracked_manifest_errors(set(TRACKED_FILES) - {relative}))
 
@@ -291,7 +297,9 @@ class LicensingPolicyTests(unittest.TestCase):
         return {
             "LICENSE",
             "LICENSE-MIT",
+            "LICENSE-APACHE-2.0",
             "LICENSING.md",
+            "THIRD_PARTY_NOTICES.md",
             "README.md",
             "AGENTS.md",
             "docs/CURRENT_MILESTONE.md",
@@ -310,17 +318,21 @@ class LicensingPolicyTests(unittest.TestCase):
             shutil.copyfile(PROJECT_ROOT / relative, target)
         return set(tracked)
 
-    def test_current_licensing_authority_and_dependency_metadata_pass(self) -> None:
-        tracked = self._authority_paths()
+    def test_current_licensing_authority_and_admitted_third_party_distribution_pass(self) -> None:
+        tracked = self._authority_paths() | {"worker-configuration.d.ts"}
         self.assertEqual(licensing_errors(PROJECT_ROOT, tracked), [])
         lock_text = (PROJECT_ROOT / "package-lock.json").read_text(encoding="utf-8")
+        worker_types = (PROJECT_ROOT / "worker-configuration.d.ts").read_text(encoding="utf-8")
         self.assertIsNotNone(LICENSE_VOCAB_RE.search(lock_text))
+        self.assertIn("Licensed under the Apache License, Version 2.0", worker_types)
 
     def test_exact_legal_and_governance_bytes_are_locked(self) -> None:
         for relative in (
             "LICENSE",
             "LICENSE-MIT",
+            "LICENSE-APACHE-2.0",
             "LICENSING.md",
+            "THIRD_PARTY_NOTICES.md",
             "README.md",
             "AGENTS.md",
             "docs/CURRENT_MILESTONE.md",
@@ -352,7 +364,7 @@ class LicensingPolicyTests(unittest.TestCase):
                 tracked.add("NOTE")
                 self.assertTrue(any("stale/current MIT claim" in e for e in licensing_errors(root, tracked)))
 
-    def test_unclassified_licensing_vocabulary_is_rejected_but_non_authority_metadata_is_allowed(self) -> None:
+    def test_unclassified_licensing_vocabulary_is_rejected_but_admitted_third_party_text_is_allowed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             tracked = self._copy_authority(root)
@@ -369,6 +381,14 @@ class LicensingPolicyTests(unittest.TestCase):
             self.assertTrue(any("outside the exact reviewed Hosted licensing authority surfaces" in e for e in errors))
             self.assertFalse(any("package-lock.json contains licensing" in e for e in errors))
             self.assertFalse(any("worker-configuration.d.ts contains licensing" in e for e in errors))
+
+    def test_third_party_license_copy_is_required(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tracked = self._copy_authority(root)
+            tracked.remove("LICENSE-APACHE-2.0")
+            errors = licensing_errors(root, tracked)
+            self.assertTrue(any("LICENSE-APACHE-2.0" in e for e in errors))
 
     def test_invalid_utf8_and_nul_are_rejected(self) -> None:
         for payload, expected in ((b"\xffopaque", "invalid UTF-8"), (b"opaque\x00data", "contains NUL bytes")):

@@ -16,7 +16,9 @@ TRACKED_FILES = (
     "README.md",
     "LICENSE",
     "LICENSE-MIT",
+    "LICENSE-APACHE-2.0",
     "LICENSING.md",
+    "THIRD_PARTY_NOTICES.md",
     ".editorconfig",
     ".gitattributes",
     ".gitignore",
@@ -47,7 +49,9 @@ WORKFLOW_SHA256 = "3db585a413edb82a26af19ba166ea188d09af8f75ee7a0c396ab1b9f36abe
 DEPENDABOT_SHA256 = "72f781d2d2aba8161ef5cc6148c64ff9fa520239bab7e23de686282293b68cf9"
 PERIMETER_LICENSE_SHA256 = "bb1d1de338bdbe282f151bf54d6bb6ad98ad37b9592539461fb51ff4bcd4e1c3"
 HISTORICAL_MIT_LICENSE_SHA256 = "273538c6ad97c94dc4230b1b66211a1ebf2769d86fa0bc93cbe2d6670eca88bd"
-LICENSING_POLICY_SHA256 = "215b53b54af9c332f98de19a7cc50c84de568bac1ffc592bade30c106717b593"
+LICENSING_POLICY_SHA256 = "2e24408e4bd928115148b1c82afde94547af6e250b427fe2c0b5b8357b6d53aa"
+APACHE_2_LICENSE_SHA256 = "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+THIRD_PARTY_NOTICES_SHA256 = "0bf7a5673ef4e293106453896d0fa826aef2ed1903589cd39590e44604657bcb"
 PACKAGE_LOCK_SHA256 = "dafea88d811a42ccb96a6b1f4cee69212732adb4f8e7b28ab4efb7997db13eb2"
 
 NODE_VERSION = "24.20.0"
@@ -101,7 +105,13 @@ LICENSING_AUTHORITY_PATHS = frozenset(
 LICENSING_GUARD_IMPLEMENTATION_PATHS = frozenset(
     {"scripts/check_development_policy.py", "scripts/check_development_policy_test.py"}
 )
-NON_AUTHORITY_LICENSE_METADATA_PATHS = frozenset({"package-lock.json", "worker-configuration.d.ts"})
+NON_AUTHORITY_LICENSE_METADATA_PATHS = frozenset({"package-lock.json"})
+THIRD_PARTY_DISTRIBUTION_PATHS = frozenset(
+    {"LICENSE-APACHE-2.0", "THIRD_PARTY_NOTICES.md", "worker-configuration.d.ts"}
+)
+NON_AUTHORITY_LICENSE_TEXT_PATHS = (
+    NON_AUTHORITY_LICENSE_METADATA_PATHS | THIRD_PARTY_DISTRIBUTION_PATHS
+)
 
 LICENSING_REQUIRED_MARKERS = {
     "LICENSING.md": (
@@ -110,8 +120,18 @@ LICENSING_REQUIRED_MARKERS = {
         "ca2282eafca03573ac9c88277125cc6973234959",
         "User data",
         "Distribution notices",
+        "LICENSE-APACHE-2.0",
+        "THIRD_PARTY_NOTICES.md",
         "every `Required Notice:`",
         "explicit inbound-rights policy",
+    ),
+    "THIRD_PARTY_NOTICES.md": (
+        "worker-configuration.d.ts",
+        "workerd@1.20260907.1",
+        "Cloudflare",
+        "Microsoft",
+        "Apache License 2.0",
+        "LICENSE-APACHE-2.0",
     ),
     "README.md": (
         "PolyForm Perimeter 1.0.1 as the prospective Hosted implementation default",
@@ -195,6 +215,7 @@ TEXT_NAMES = {
     ".nvmrc",
     "LICENSE",
     "LICENSE-MIT",
+    "LICENSE-APACHE-2.0",
 }
 
 
@@ -485,7 +506,9 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
     exact_hashes = {
         "LICENSE": PERIMETER_LICENSE_SHA256,
         "LICENSE-MIT": HISTORICAL_MIT_LICENSE_SHA256,
+        "LICENSE-APACHE-2.0": APACHE_2_LICENSE_SHA256,
         "LICENSING.md": LICENSING_POLICY_SHA256,
+        "THIRD_PARTY_NOTICES.md": THIRD_PARTY_NOTICES_SHA256,
     }
     for relative, expected in exact_hashes.items():
         if relative not in tracked_relatives:
@@ -530,11 +553,11 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
             if marker not in text:
                 errors.append(f"{relative} missing licensing invariant marker: {marker}")
 
-    # All current tracked files are intentional text. Dependency metadata and the
-    # exact-hash-locked Wrangler-generated runtime declaration may contain
-    # third-party license/rights notices. Those bytes are not Hosted licensing
-    # authority and are exempt from prose claim/vocabulary classification only;
-    # their own exact/toolchain checks remain mandatory elsewhere in this guard.
+    # All current tracked files are intentional text. Dependency metadata plus
+    # exact-hash-locked third-party distribution surfaces may contain third-party
+    # license/rights notices. Those bytes are not Hosted licensing authority and
+    # are exempt from prose claim/vocabulary classification only; their exact,
+    # toolchain, and third-party-license checks remain mandatory.
     for relative in sorted(tracked_relatives):
         path = root / relative
         text, read_error = _read_utf8(path)
@@ -543,7 +566,7 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
             continue
 
         if (
-            relative not in NON_AUTHORITY_LICENSE_METADATA_PATHS
+            relative not in NON_AUTHORITY_LICENSE_TEXT_PATHS
             and relative != "LICENSE-MIT"
             and CURRENT_MIT_CLAIM_RE.search(text)
         ):
@@ -554,7 +577,7 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
         if (
             relative not in LICENSING_AUTHORITY_PATHS
             and relative not in LICENSING_GUARD_IMPLEMENTATION_PATHS
-            and relative not in NON_AUTHORITY_LICENSE_METADATA_PATHS
+            and relative not in NON_AUTHORITY_LICENSE_TEXT_PATHS
             and LICENSE_VOCAB_RE.search(text)
         ):
             errors.append(
