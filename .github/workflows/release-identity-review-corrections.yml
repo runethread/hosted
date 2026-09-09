@@ -1,0 +1,85 @@
+name: Apply release identity review corrections
+
+on:
+  push:
+    branches:
+      - runethread/release-identity-baseline
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    if: "${{ github.event.head_commit.message == 'chore: apply release identity review corrections' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch with branch-only write token
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Apply only the enumerated review corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected exactly one replacement target, got {count}: {old!r}')
+              return text.replace(old, new, 1)
+
+          tests_path = Path('scripts/check_development_policy_test.py')
+          tests = tests_path.read_text(encoding='utf-8')
+          tests = replace_once(
+              tests,
+              '\n\nif __name__ == "__main__":\n    unittest.main()\n\n\nclass ReleaseIdentityPolicyTests',
+              '\n\nclass ReleaseIdentityPolicyTests',
+          )
+          if 'if __name__ == "__main__":' in tests:
+              raise SystemExit('unexpected second unittest entrypoint')
+          tests = tests.rstrip() + '\n\n\nif __name__ == "__main__":\n    unittest.main()\n'
+          tests_path.write_text(tests, encoding='utf-8')
+
+          guard_path = Path('scripts/check_development_policy.py')
+          guard = guard_path.read_text(encoding='utf-8')
+          guard = replace_once(
+              guard,
+              '"README.md": "09a51eb6a741f535aafd2ac001afaa80142b929e"',
+              '"README.md": "aa872d548ec2a675def61645a3603390a092b49f"',
+          )
+          guard = replace_once(
+              guard,
+              '"docs/CURRENT_MILESTONE.md": "b0d4a4089e47cb658e208a03b55052b97956c1fd"',
+              '"docs/CURRENT_MILESTONE.md": "c45c926a60c81201e1161c873d67509c58706963"',
+          )
+          guard_path.write_text(guard, encoding='utf-8')
+          PY
+
+          python3 -m py_compile scripts/check_development_policy.py scripts/check_development_policy_test.py
+          test_output="$(python3 scripts/check_development_policy_test.py 2>&1)"
+          printf '%s\n' "$test_output"
+          printf '%s\n' "$test_output" | grep -F 'Ran 37 tests'
+          printf '%s\n' "$test_output" | grep -F 'OK'
+          python3 scripts/check_development_policy.py
+          git diff --check
+
+          git add scripts/check_development_policy.py scripts/check_development_policy_test.py
+          git rm .github/workflows/release-identity-review-corrections.yml
+          git diff --cached --check
+
+          expected_paths=$'.github/workflows/release-identity-review-corrections.yml\nscripts/check_development_policy.py\nscripts/check_development_policy_test.py'
+          actual_paths="$(git diff --cached --name-only | sort)"
+          test "$actual_paths" = "$expected_paths"
+
+          echo "guard_blob=$(git hash-object scripts/check_development_policy.py)"
+          echo "tests_blob=$(git hash-object scripts/check_development_policy_test.py)"
+          echo "final_tree=$(git write-tree)"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'policy: correct release identity review findings'
+          git push origin HEAD:runethread/release-identity-baseline
