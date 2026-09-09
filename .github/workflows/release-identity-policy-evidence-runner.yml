@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   evidence:
-    if: "${{ github.event.head_commit.message == 'chore: execute ADR-028 ratification evidence' }}"
+    if: "${{ github.event.head_commit.message == 'chore: verify corrected ADR-028 ratification evidence' }}"
     runs-on: ubuntu-latest
     steps:
       - name: Check out branch
@@ -36,6 +36,10 @@ jobs:
           code = code.replace(
               'subprocess.run(["git", "rm", "--cached", TEMP_WORKFLOW], check=True)',
               'subprocess.run(["git", "rm", "--cached", "--ignore-unmatch", TEMP_WORKFLOW], check=True)',
+          )
+          code = code.replace(
+              'a3da1a6ed672d2c8dc9722764eef8d97c114cba9',
+              'd72f89483478242ba11759ac61f27a1bec196dd9',
           )
 
           subprocess.check_call([
