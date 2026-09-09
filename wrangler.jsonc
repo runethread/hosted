@@ -8,5 +8,12 @@
     "no_nodejs_compat_v2"
   ],
   "workers_dev": false,
-  "preview_urls": false
+  "preview_urls": false,
+  "minify": false,
+  "upload_source_maps": false,
+  "find_additional_modules": false,
+  "send_metrics": false,
+  "dependencies_instrumentation": {
+    "enabled": false
+  }
 }
