@@ -1,4 +1,8 @@
-import { isValidOpaqueId, type AuthorizedRepositoryBinding } from "./api";
+import {
+  isValidOpaqueId,
+  type AuthorizedRepositoryBinding,
+  type BoundaryLimits,
+} from "./api";
 
 export const SEALED_REQUEST_PROTOCOL_VERSION = 1 as const;
 export const SEALED_REQUEST_OBJECT_CLASS = "core-request-json-bytes" as const;
@@ -81,10 +85,15 @@ export class SealedRequestStorageUnprovenError extends Error {
 export async function planSealedRequest(
   binding: SealedRequestBinding,
   requestBytes: Uint8Array,
+  limits: BoundaryLimits,
 ): Promise<PlannedSealedRequest> {
   validateBinding(binding);
+  validateStorageLimits(limits);
   if (requestBytes.byteLength === 0) {
     throw new RangeError("sealed request bytes must be non-empty");
+  }
+  if (requestBytes.byteLength > limits.maxCoreRequestBytes) {
+    throw new RangeError("sealed request bytes exceed maxCoreRequestBytes");
   }
 
   const bytes = new Uint8Array(requestBytes);
@@ -117,8 +126,9 @@ export async function persistSealedRequest(
   store: SealedRequestObjectStore,
   binding: SealedRequestBinding,
   requestBytes: Uint8Array,
+  limits: BoundaryLimits,
 ): Promise<SealedRequestPersistenceProof> {
-  const planned = await planSealedRequest(binding, requestBytes);
+  const planned = await planSealedRequest(binding, requestBytes, limits);
 
   let createResult: CreateIfAbsentResult | null = null;
   let writeWasAmbiguous = false;
@@ -202,6 +212,12 @@ function validateBinding(binding: SealedRequestBinding): void {
   }
 }
 
+function validateStorageLimits(limits: BoundaryLimits): void {
+  if (!Number.isSafeInteger(limits.maxCoreRequestBytes) || limits.maxCoreRequestBytes < 1) {
+    throw new RangeError("maxCoreRequestBytes must be a positive safe integer");
+  }
+}
+
 function expectedMetadata(
   binding: SealedRequestBinding,
   sha256Hex: string,
@@ -221,12 +237,10 @@ function metadataEqual(
   actual: Readonly<Record<string, string>>,
   expected: Readonly<Record<string, string>>,
 ): boolean {
-  const actualEntries = Object.entries(actual).sort(([a], [b]) => a.localeCompare(b));
-  const expectedEntries = Object.entries(expected).sort(([a], [b]) => a.localeCompare(b));
-  if (actualEntries.length !== expectedEntries.length) return false;
-  return expectedEntries.every(
-    ([key, value], index) => actualEntries[index]?.[0] === key && actualEntries[index]?.[1] === value,
-  );
+  const actualKeys = Object.keys(actual);
+  const expectedEntries = Object.entries(expected);
+  if (actualKeys.length !== expectedEntries.length) return false;
+  return expectedEntries.every(([key, value]) => actual[key] === value);
 }
 
 function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
