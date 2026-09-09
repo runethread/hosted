@@ -407,3 +407,68 @@ class LicensingPolicyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReleaseIdentityPolicyTests(unittest.TestCase):
+    def _copy_surfaces(self, root: Path) -> set[str]:
+        tracked = {"release/identity-policy.json", "scripts/release_identity.mjs"}
+        for relative in tracked:
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(PROJECT_ROOT / relative, target)
+        return tracked
+
+    def test_exact_release_identity_policy_is_allowed(self) -> None:
+        from check_development_policy import release_identity_errors
+        self.assertEqual(release_identity_errors(PROJECT_ROOT, set(TRACKED_FILES)), [])
+
+    def test_missing_release_identity_surface_is_rejected(self) -> None:
+        from check_development_policy import release_identity_errors
+        for missing in ("release/identity-policy.json", "scripts/release_identity.mjs"):
+            with self.subTest(missing=missing):
+                self.assertTrue(release_identity_errors(PROJECT_ROOT, set(TRACKED_FILES) - {missing}))
+
+    def test_versioning_authority_and_authority_capability_drift_are_rejected(self) -> None:
+        from check_development_policy import release_identity_errors
+        mutations = (
+            ("versioning", "scheme", "calendar"),
+            ("versioning", "authority_git_commit", "0" * 40),
+            ("versioning", "authority_git_blob", "0" * 40),
+            ("versioning", "release_identifier_prefix", "x"),
+            ("protocols", "hosted_api", "1"),
+            ("capabilities", "publication", True),
+        )
+        for section, key, value in mutations:
+            with self.subTest(section=section, key=key), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                tracked = self._copy_surfaces(root)
+                policy_path = root / "release/identity-policy.json"
+                policy = json.loads(policy_path.read_text(encoding="utf-8"))
+                policy[section][key] = value
+                policy_path.write_text(json.dumps(policy, indent=2) + "\n", encoding="utf-8")
+                self.assertTrue(release_identity_errors(root, tracked))
+
+    def test_publication_enable_is_rejected(self) -> None:
+        from check_development_policy import release_identity_errors
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tracked = self._copy_surfaces(root)
+            policy_path = root / "release/identity-policy.json"
+            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            policy["publication_enabled"] = True
+            policy_path.write_text(json.dumps(policy, indent=2) + "\n", encoding="utf-8")
+            self.assertTrue(release_identity_errors(root, tracked))
+
+    def test_release_verifier_contains_semver_and_exact_manifest_boundaries(self) -> None:
+        text = (PROJECT_ROOT / "scripts/release_identity.mjs").read_text(encoding="utf-8")
+        for marker in (
+            "SEMVER_2_0_0",
+            "verifySemverImplementation",
+            'release_identifier_prefix !== "v"',
+            "semver: semverValue",
+            "publication_enabled !== false",
+            "--x-provision=false",
+            "--x-auto-create=false",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, text)
