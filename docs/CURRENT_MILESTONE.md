@@ -42,7 +42,7 @@ CI uses release identifier `v0.0.0-ci` / SemVer value `0.0.0-ci` only as a reser
 
 `publication_enabled` remains false. This baseline creates no GitHub Release, tag, downloadable artifact, Cloudflare version, deployment, route, credential, provider resource, or production traffic.
 
-A generated manifest proves the identities it records; it does not independently prove live GitHub branch protection or status-check state. Any future publication mechanism must separately prove that the source commit is the intended current protected `main` and that required `validate` evidence belongs to that exact commit.
+A generated manifest binds and records the identities it contains and proves the locally verified source/build/artifact relationships. It does not independently prove external Core/provider facts or live GitHub branch protection/status-check state. Any future publication mechanism must separately prove that the source commit is the intended current protected `main` and that required `validate` evidence belongs to that exact commit.
 
 ## Applicable Runethread invariants
 
