@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join, relative, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-const ROOT = resolve(new URL("..", import.meta.url).pathname);
+const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const POLICY_PATH = join(ROOT, "release", "identity-policy.json");
 
 function fail(message) {
@@ -61,13 +62,14 @@ function collectFiles(root) {
   function walk(directory) {
     for (const name of readdirSync(directory).sort()) {
       const absolute = join(directory, name);
-      const metadata = statSync(absolute, { throwIfNoEntry: true });
+      const metadata = lstatSync(absolute, { throwIfNoEntry: true });
+      const key = relative(root, absolute).replaceAll("\\", "/");
+      if (metadata.isSymbolicLink()) fail(`symlink build output is forbidden: ${key}`);
       if (metadata.isDirectory()) {
         walk(absolute);
         continue;
       }
-      if (!metadata.isFile()) fail(`non-regular build artifact ${relative(root, absolute)}`);
-      const key = relative(root, absolute).replaceAll("\\", "/");
+      if (!metadata.isFile()) fail(`non-regular build artifact ${key}`);
       files[key] = sha256(readFileSync(absolute));
     }
   }
@@ -82,10 +84,33 @@ function verifyExactFiles(entries) {
   }
 }
 
+function exactPathSet(policy, files) {
+  const deploy = [...policy.build.deploy_artifact_paths].sort();
+  const auxiliary = [...policy.build.dry_run_auxiliary_paths].sort();
+  const expectedPaths = [...deploy, ...auxiliary].sort();
+  if (new Set(expectedPaths).size !== expectedPaths.length) {
+    fail("deploy and dry-run auxiliary path sets overlap or contain duplicates");
+  }
+  const actualPaths = Object.keys(files).sort();
+  if (JSON.stringify(actualPaths) !== JSON.stringify(expectedPaths)) {
+    fail(`dry-run output path set changed: ${JSON.stringify({ expected: expectedPaths, actual: actualPaths })}`);
+  }
+  return deploy;
+}
+
+function deployArtifacts(policy, files) {
+  const deployPaths = exactPathSet(policy, files);
+  return sortedObject(Object.fromEntries(deployPaths.map((path) => [path, files[path]])));
+}
+
 function buildOnce(policy, label) {
   const outdir = mkdtempSync(join(tmpdir(), `runethread-hosted-${label}-`));
   const npx = process.platform === "win32" ? "npx.cmd" : "npx";
-  const env = { ...process.env, NODE_ENV: policy.build.node_env };
+  const env = {
+    ...process.env,
+    NODE_ENV: policy.build.node_env,
+    WRANGLER_SEND_METRICS: "false",
+  };
   for (const key of [
     "CLOUDFLARE_API_TOKEN",
     "CLOUDFLARE_API_KEY",
@@ -93,20 +118,24 @@ function buildOnce(policy, label) {
     "CLOUDFLARE_ACCOUNT_ID",
   ]) delete env[key];
 
-  run(
-    npx,
-    ["--no-install", "wrangler", ...policy.build.wrangler_args, "--outdir", outdir],
-    { env },
-  );
-  const files = collectFiles(outdir);
-  rmSync(outdir, { recursive: true, force: true });
-  return files;
+  try {
+    run(
+      npx,
+      ["--no-install", "wrangler", ...policy.build.wrangler_args, "--outdir", outdir],
+      { env },
+    );
+    return collectFiles(outdir);
+  } finally {
+    rmSync(outdir, { recursive: true, force: true });
+  }
 }
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const policyBytes = readFileSync(POLICY_PATH);
   const policy = JSON.parse(policyBytes.toString("utf8"));
+  if (policy.publication_enabled !== false) fail("release identity baseline must remain non-publishing");
+
   const versionPattern = new RegExp(policy.release_version.format);
   if (!versionPattern.test(args.version)) fail(`invalid version ${args.version}`);
   if (args.mode === "ci" && args.version !== policy.release_version.ci_reserved) {
@@ -132,16 +161,18 @@ function main() {
     ...policy.distribution.required_files_sha256,
   });
 
-  const first = buildOnce(policy, "a");
-  const second = buildOnce(policy, "b");
+  const firstAll = buildOnce(policy, "a");
+  const secondAll = buildOnce(policy, "b");
+  const first = deployArtifacts(policy, firstAll);
+  const second = deployArtifacts(policy, secondAll);
   if (JSON.stringify(first) !== JSON.stringify(second)) {
-    fail(`two clean dry-run builds differ: ${JSON.stringify({ first, second })}`);
+    fail(`two clean dry-run deploy artifacts differ: ${JSON.stringify({ first, second })}`);
   }
-  if (!Object.keys(first).length) fail("dry-run build produced no files");
+  if (!Object.keys(first).length) fail("dry-run build produced no deploy artifacts");
 
-  const expected = sortedObject(policy.build.expected_artifacts);
+  const expected = sortedObject(policy.build.expected_deploy_artifacts);
   if (!args.probe && JSON.stringify(first) !== JSON.stringify(expected)) {
-    fail(`artifact identity mismatch: ${JSON.stringify({ expected, actual: first })}`);
+    fail(`deploy artifact identity mismatch: ${JSON.stringify({ expected, actual: first })}`);
   }
 
   const manifest = {
@@ -161,8 +192,8 @@ function main() {
       npm: policy.build.npm,
       package_lock_sha256: policy.build.package_lock_sha256,
       node_env: policy.build.node_env,
-      artifacts: first,
-      artifact_set_sha256: sha256(Buffer.from(JSON.stringify(first))),
+      deploy_artifacts: first,
+      deploy_artifact_set_sha256: sha256(Buffer.from(JSON.stringify(first))),
     },
     protocols: policy.protocols,
     capabilities: policy.capabilities,
@@ -174,8 +205,9 @@ function main() {
   const manifestText = `${JSON.stringify(manifest, null, 2)}\n`;
   if (args.output) writeFileSync(resolve(ROOT, args.output), manifestText, "utf8");
   if (args.probe) {
-    console.log(`release_probe_artifacts=${JSON.stringify(first)}`);
-    console.log(`release_probe_artifact_set_sha256=${manifest.build.artifact_set_sha256}`);
+    console.log(`release_probe_deploy_artifacts=${JSON.stringify(first)}`);
+    console.log(`release_probe_deploy_artifact_set_sha256=${manifest.build.deploy_artifact_set_sha256}`);
+    console.log(`release_probe_auxiliary_paths=${JSON.stringify([...policy.build.dry_run_auxiliary_paths].sort())}`);
   } else {
     console.log(`release_identity_sha256=${sha256(Buffer.from(manifestText))}`);
   }
