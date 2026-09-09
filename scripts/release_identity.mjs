@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { lstatSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -103,9 +103,22 @@ function deployArtifacts(policy, files) {
   return sortedObject(Object.fromEntries(deployPaths.map((path) => [path, files[path]])));
 }
 
-function buildOnce(policy, label) {
+function lockedWrangler(policy) {
+  const packagePath = join(ROOT, "node_modules", "wrangler", "package.json");
+  const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
+  if (packageJson.version !== policy.worker.wrangler) {
+    fail(`installed Wrangler ${packageJson.version} does not match ${policy.worker.wrangler}`);
+  }
+  const bin = typeof packageJson.bin === "string" ? packageJson.bin : packageJson.bin?.wrangler;
+  if (!bin) fail("installed Wrangler package has no wrangler CLI entrypoint");
+  const cli = resolve(dirname(packagePath), bin);
+  const metadata = lstatSync(cli, { throwIfNoEntry: true });
+  if (!metadata.isFile() || metadata.isSymbolicLink()) fail("Wrangler CLI entrypoint must be a regular file");
+  return cli;
+}
+
+function buildOnce(policy, wranglerCli, label) {
   const outdir = mkdtempSync(join(tmpdir(), `runethread-hosted-${label}-`));
-  const npx = process.platform === "win32" ? "npx.cmd" : "npx";
   const env = {
     ...process.env,
     NODE_ENV: policy.build.node_env,
@@ -119,11 +132,7 @@ function buildOnce(policy, label) {
   ]) delete env[key];
 
   try {
-    run(
-      npx,
-      ["--no-install", "wrangler", ...policy.build.wrangler_args, "--outdir", outdir],
-      { env },
-    );
+    run(process.execPath, [wranglerCli, ...policy.build.wrangler_args, "--outdir", outdir], { env });
     return collectFiles(outdir);
   } finally {
     rmSync(outdir, { recursive: true, force: true });
@@ -135,6 +144,9 @@ function main() {
   const policyBytes = readFileSync(POLICY_PATH);
   const policy = JSON.parse(policyBytes.toString("utf8"));
   if (policy.publication_enabled !== false) fail("release identity baseline must remain non-publishing");
+  if (process.version !== `v${policy.build.node}`) {
+    fail(`Node ${process.version} does not match v${policy.build.node}`);
+  }
 
   const versionPattern = new RegExp(policy.release_version.format);
   if (!versionPattern.test(args.version)) fail(`invalid version ${args.version}`);
@@ -161,8 +173,9 @@ function main() {
     ...policy.distribution.required_files_sha256,
   });
 
-  const firstAll = buildOnce(policy, "a");
-  const secondAll = buildOnce(policy, "b");
+  const wranglerCli = lockedWrangler(policy);
+  const firstAll = buildOnce(policy, wranglerCli, "a");
+  const secondAll = buildOnce(policy, wranglerCli, "b");
   const first = deployArtifacts(policy, firstAll);
   const second = deployArtifacts(policy, secondAll);
   if (JSON.stringify(first) !== JSON.stringify(second)) {
