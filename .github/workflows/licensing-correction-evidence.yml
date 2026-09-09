@@ -1,4 +1,4 @@
-name: Generate licensing-correction evidence
+name: Materialize licensing correction
 
 on:
   push:
@@ -6,20 +6,20 @@ on:
       - runethread/toolchain-worker-shell
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  evidence:
-    if: "${{ github.event.head_commit.message == 'chore: stage licensing-correction evidence' }}"
+  materialize:
+    if: "${{ github.event.head_commit.message == 'chore: materialize licensing correction' }}"
     runs-on: ubuntu-latest
     steps:
       - name: Check out branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
 
-      - name: Construct and verify complete correction set without pushing
+      - name: Reproduce exact reviewed correction, verify identities, and self-remove
         shell: bash
         run: |
           set -euo pipefail
@@ -32,9 +32,14 @@ jobs:
           python3 scripts/check_development_policy_test.py
           python3 scripts/check_development_policy.py
           git diff --cached --check
-          printf 'APACHE_SHA256=%s\n' "$(sha256sum LICENSE-APACHE-2.0 | awk '{print $1}')"
-          printf 'THIRD_PARTY_NOTICE_SHA256=%s\n' "$(sha256sum THIRD_PARTY_NOTICES.md | awk '{print $1}')"
-          printf 'LICENSING_SHA256=%s\n' "$(sha256sum LICENSING.md | awk '{print $1}')"
-          printf 'GUARD_SHA256=%s\n' "$(sha256sum scripts/check_development_policy.py | awk '{print $1}')"
-          printf 'TEST_SHA256=%s\n' "$(sha256sum scripts/check_development_policy_test.py | awk '{print $1}')"
-          printf 'FINAL_TREE=%s\n' "$(git write-tree)"
+          test "$(sha256sum LICENSE-APACHE-2.0 | awk '{print $1}')" = "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+          test "$(sha256sum THIRD_PARTY_NOTICES.md | awk '{print $1}')" = "0bf7a5673ef4e293106453896d0fa826aef2ed1903589cd39590e44604657bcb"
+          test "$(sha256sum LICENSING.md | awk '{print $1}')" = "2e24408e4bd928115148b1c82afde94547af6e250b427fe2c0b5b8357b6d53aa"
+          test "$(sha256sum scripts/check_development_policy.py | awk '{print $1}')" = "809f4fdd2840048eb96ff0e55c2d9945950345ba86422c65bcbf6cfbe4740704"
+          test "$(sha256sum scripts/check_development_policy_test.py | awk '{print $1}')" = "09ecb85e3b1580b90f8e406aa25c78d7d4b0fe7e95e1148aec17879796b3684e"
+          test "$(git write-tree)" = "43c1a9830b571f10f5e17be71bee880c73b5de97"
+          test "$(git ls-files '.github/workflows/*')" = ".github/workflows/validate.yml"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "policy: satisfy Apache notice boundary for generated Worker types"
+          git push origin HEAD:runethread/toolchain-worker-shell
