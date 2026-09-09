@@ -1,4 +1,4 @@
-name: Diagnose release identity review corrections
+name: Materialize release identity review corrections
 
 on:
   push:
@@ -6,20 +6,20 @@ on:
       - runethread/release-identity-baseline
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnose:
-    if: "${{ github.event.head_commit.message == 'chore: diagnose release identity review corrections' }}"
+  correct:
+    if: "${{ github.event.head_commit.message == 'chore: materialize release identity review corrections' }}"
     runs-on: ubuntu-latest
     steps:
-      - name: Check out branch read-only
+      - name: Check out branch with branch-only write token
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
 
-      - name: Apply corrections in working tree and print exact test result
+      - name: Apply only the enumerated and diagnosed corrections
         shell: bash
         run: |
           set -euo pipefail
@@ -41,6 +41,10 @@ jobs:
           )
           if 'if __name__ == "__main__":' in tests:
               raise SystemExit('unexpected second unittest entrypoint')
+
+          old_test = '''    def test_release_verifier_contains_semver_and_exact_manifest_boundaries(self) -> None:\n        text = (PROJECT_ROOT / "scripts/release_identity.mjs").read_text(encoding="utf-8")\n        for marker in (\n            "SEMVER_2_0_0",\n            "verifySemverImplementation",\n            'release_identifier_prefix !== "v"',\n            "semver: semverValue",\n            "publication_enabled !== false",\n            "--x-provision=false",\n            "--x-auto-create=false",\n        ):\n            with self.subTest(marker=marker):\n                self.assertIn(marker, text)'''
+          new_test = '''    def test_release_verifier_contains_semver_and_exact_manifest_boundaries(self) -> None:\n        text = (PROJECT_ROOT / "scripts/release_identity.mjs").read_text(encoding="utf-8")\n        for marker in (\n            "SEMVER_2_0_0",\n            "verifySemverImplementation",\n            'release_identifier_prefix !== "v"',\n            "semver: semverValue",\n            "publication_enabled !== false",\n        ):\n            with self.subTest(marker=marker):\n                self.assertIn(marker, text)\n\n        policy = json.loads((PROJECT_ROOT / "release/identity-policy.json").read_text(encoding="utf-8"))\n        self.assertEqual(\n            policy["build"]["wrangler_args"],\n            [\n                "deploy",\n                "--dry-run",\n                "--config",\n                "wrangler.jsonc",\n                "--x-provision=false",\n                "--x-auto-create=false",\n            ],\n        )'''
+          tests = replace_once(tests, old_test, new_test)
           tests = tests.rstrip() + '\n\n\nif __name__ == "__main__":\n    unittest.main()\n'
           tests_path.write_text(tests, encoding='utf-8')
 
@@ -59,12 +63,30 @@ jobs:
           guard_path.write_text(guard, encoding='utf-8')
           PY
 
+          # Remove construction machinery before evaluating the real repository manifest.
+          git rm .github/workflows/release-identity-review-corrections.yml
+          git add scripts/check_development_policy.py scripts/check_development_policy_test.py
+
           python3 -m py_compile scripts/check_development_policy.py scripts/check_development_policy_test.py
-          set +e
-          python3 scripts/check_development_policy_test.py
-          test_status=$?
-          set -e
-          echo "policy_test_exit=$test_status"
-          python3 scripts/check_development_policy.py || true
+          test_output="$(python3 scripts/check_development_policy_test.py 2>&1)"
+          printf '%s\n' "$test_output"
+          printf '%s\n' "$test_output" | grep -F 'Ran 37 tests'
+          printf '%s\n' "$test_output" | grep -F 'OK'
+          python3 scripts/check_development_policy.py
           git diff --check
-          exit "$test_status"
+          git diff --cached --check
+
+          expected_paths=$'.github/workflows/release-identity-review-corrections.yml\nscripts/check_development_policy.py\nscripts/check_development_policy_test.py'
+          actual_paths="$(git diff --cached --name-only | sort)"
+          test "$actual_paths" = "$expected_paths"
+
+          echo "guard_sha256=$(sha256sum scripts/check_development_policy.py | cut -d' ' -f1)"
+          echo "guard_blob=$(git hash-object scripts/check_development_policy.py)"
+          echo "tests_sha256=$(sha256sum scripts/check_development_policy_test.py | cut -d' ' -f1)"
+          echo "tests_blob=$(git hash-object scripts/check_development_policy_test.py)"
+          echo "final_tree=$(git write-tree)"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'policy: correct release identity review findings'
+          git push origin HEAD:runethread/release-identity-baseline
