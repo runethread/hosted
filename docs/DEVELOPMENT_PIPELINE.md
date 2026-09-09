@@ -36,7 +36,7 @@ Validation MUST:
 - admit only the exact reviewed `actions/checkout` and `actions/setup-node` identities in the required workflow until policy is deliberately extended;
 - clean-install the exact lockfile with install lifecycle scripts disabled;
 - verify exact Node and npm identities before executing toolchain checks;
-- run Wrangler generated-type drift checking with runtime declarations excluded, TypeScript checks, and Workers-runtime tests;
+- run Wrangler generated-type drift checking over committed environment plus compatibility-locked runtime declarations, TypeScript checks, and Workers-runtime tests;
 - retain the Python policy guard compilation, negative/self-tests, and enforcement invocation;
 - retain the `quality + toolchain -> validate` dependency and require both to be exactly successful under `if: always()`.
 

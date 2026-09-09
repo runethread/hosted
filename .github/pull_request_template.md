@@ -91,7 +91,7 @@ For material pipeline/repository-policy/dependency/toolchain/CI-self-protection 
 - [ ] Direct versions are exact, Node/npm identities are explicit, and the package is non-publishable.
 - [ ] Clean install disables lifecycle scripts in required CI.
 - [ ] Dependency advisory/license/platform implications were reviewed.
-- [ ] Generated Worker Env types exclude unnecessary runtime declarations and drift checking passes.
+- [ ] Generated Worker Env plus compatibility-locked runtime types are committed and `wrangler types --check` passes.
 
 ## Mandatory pipeline on exact head
 

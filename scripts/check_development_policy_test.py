@@ -211,18 +211,19 @@ class ToolchainSurfaceTests(unittest.TestCase):
             path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
             self.assertTrue(wrangler_errors(path))
 
-    def test_generated_types_are_env_only(self) -> None:
+    def test_generated_types_include_compatibility_locked_runtime(self) -> None:
         self.assertEqual(generated_types_errors(PROJECT_ROOT / "worker-configuration.d.ts"), [])
         text = (PROJECT_ROOT / "worker-configuration.d.ts").read_text(encoding="utf-8")
-        self.assertIn("--include-runtime=false", text)
-        self.assertNotIn("Copyright Microsoft", text)
+        self.assertIn("Runtime types generated with workerd@", text)
+        self.assertIn("cloudflare:workers", text)
+        self.assertNotIn("--include-runtime=false", text)
 
-    def test_generated_runtime_declaration_marker_is_rejected(self) -> None:
+    def test_missing_runtime_declaration_marker_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "worker-configuration.d.ts"
+            text = (PROJECT_ROOT / "worker-configuration.d.ts").read_text(encoding="utf-8")
             path.write_text(
-                (PROJECT_ROOT / "worker-configuration.d.ts").read_text(encoding="utf-8")
-                + "\n// Runtime APIs\n// Copyright Microsoft\n",
+                replace_once(text, "// Begin runtime types", "// Runtime types omitted"),
                 encoding="utf-8",
             )
             self.assertTrue(generated_types_errors(path))
@@ -351,16 +352,23 @@ class LicensingPolicyTests(unittest.TestCase):
                 tracked.add("NOTE")
                 self.assertTrue(any("stale/current MIT claim" in e for e in licensing_errors(root, tracked)))
 
-    def test_unclassified_licensing_vocabulary_is_rejected_but_lock_metadata_is_allowed(self) -> None:
+    def test_unclassified_licensing_vocabulary_is_rejected_but_non_authority_metadata_is_allowed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             tracked = self._copy_authority(root)
+            generated = root / "worker-configuration.d.ts"
+            generated.write_text(
+                "Licensed under Apache-2.0. This generated declaration contains third-party rights notices.\n",
+                encoding="utf-8",
+            )
+            tracked.add("worker-configuration.d.ts")
             note = root / "notes.txt"
             note.write_text("Dual licensing policy.\n", encoding="utf-8")
             tracked.add("notes.txt")
             errors = licensing_errors(root, tracked)
             self.assertTrue(any("outside the exact reviewed Hosted licensing authority surfaces" in e for e in errors))
             self.assertFalse(any("package-lock.json contains licensing" in e for e in errors))
+            self.assertFalse(any("worker-configuration.d.ts contains licensing" in e for e in errors))
 
     def test_invalid_utf8_and_nul_are_rejected(self) -> None:
         for payload, expected in ((b"\xffopaque", "invalid UTF-8"), (b"opaque\x00data", "contains NUL bytes")):
@@ -374,7 +382,7 @@ class LicensingPolicyTests(unittest.TestCase):
 
     def test_git_blob_helper_matches_known_worker_types_blob(self) -> None:
         data = (PROJECT_ROOT / "worker-configuration.d.ts").read_bytes()
-        self.assertEqual(git_blob_sha1(data), "e4acd67aa4ae51c7a46ade52b8b9850b48d5aacb")
+        self.assertEqual(git_blob_sha1(data), "9c6b72e232be65f6405baa77ffbb7b7515ade72d")
 
 
 if __name__ == "__main__":

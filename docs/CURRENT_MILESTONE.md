@@ -9,7 +9,7 @@ The protected Hosted baseline now includes the reviewed developer toolchain and 
 - Node `24.20.0` and npm `11.19.0` are the exact admitted developer/CI identities;
 - direct development dependencies are exact: Wrangler `4.129.1`, TypeScript `5.8.3`, Vitest `4.1.11`, and `@cloudflare/vitest-plugin` `1.1.5`;
 - `package.json` and `package-lock.json` are committed together and the package is non-publishable;
-- generated Worker environment types are committed with Wrangler runtime declarations deliberately excluded;
+- generated Worker environment and runtime types are committed from `wrangler types`, compatibility-locked by the Worker date/flags, and checked for drift;
 - CI clean-installs with lifecycle scripts disabled and runs the supported Workers-runtime test integration on Linux, macOS, and Windows;
 - the Worker shell returns HTTP 503 / `not_operational` and has no provider binding, route, secret, persistence, mutation authority, publication authority, deploy script, or production resource;
 - validation remains read-only and the protected `validate` aggregate remains the merge check;
