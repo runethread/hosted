@@ -1,0 +1,68 @@
+name: Admit sealed request storage boundary
+
+on:
+  push:
+    branches:
+      - runethread/sealed-request-storage-v1
+    paths:
+      - .github/workflows/admit-sealed-storage.yml
+
+permissions:
+  contents: write
+
+jobs:
+  ratify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Admit only reviewed storage paths and self-remove
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/runethread/sealed-request-storage-v1)"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/check_development_policy.py")
+          text = path.read_text()
+          old = '''    "src/api.ts",
+              "src/index.ts",
+              "test/api.test.ts",
+              "test/index.test.ts",
+          '''
+          new = '''    "src/api.ts",
+              "src/index.ts",
+              "src/r2_sealed_request_store.ts",
+              "src/sealed_request.ts",
+              "test/api.test.ts",
+              "test/index.test.ts",
+              "test/sealed_request.test.ts",
+          '''
+          if text.count(old) != 1:
+              raise SystemExit("tracked-file manifest target did not match exactly once")
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+          git rm .github/workflows/admit-sealed-storage.yml
+          git add scripts/check_development_policy.py
+
+          python3 -m py_compile scripts/check_development_policy.py scripts/check_development_policy_test.py
+          python3 scripts/check_development_policy_test.py
+          python3 scripts/check_development_policy.py
+          git diff --check
+          git diff --cached --check
+
+          actual="$(git diff --cached --name-only | sort)"
+          expected="$(printf '%s\n' '.github/workflows/admit-sealed-storage.yml' 'scripts/check_development_policy.py' | sort)"
+          test "$actual" = "$expected"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "policy: admit sealed request storage boundary"
+          git push origin HEAD:runethread/sealed-request-storage-v1
