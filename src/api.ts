@@ -1,12 +1,11 @@
 export const HOSTED_API_BOUNDARY_VERSION = 1 as const;
-export const CORE_MUTATION_MEDIA_TYPE = "application/vnd.runethread.core.apply+json" as const;
 
 const OPAQUE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export type AuthorizationAction = "submit" | "status" | "cancel";
 
 export interface AuthenticatedPrincipal {
-  readonly subject: string;
+  readonly principalId: string;
 }
 
 export interface ApiCallContext {
@@ -38,13 +37,13 @@ export interface SubmitMutationCommand {
   readonly coreRequestBytes: Uint8Array;
 }
 
-export interface StatusCommand {
+export interface OperationSelector {
+  readonly bindingId: string;
   readonly operationId: string;
 }
 
-export interface CancelCommand {
-  readonly operationId: string;
-}
+export type StatusCommand = OperationSelector;
+export type CancelCommand = OperationSelector;
 
 export interface BoundaryLimits {
   readonly maxCoreRequestBytes: number;
@@ -67,9 +66,15 @@ export type SubmissionValidationResult =
     }
   | { readonly ok: false; readonly code: SubmissionValidationErrorCode };
 
-export interface AcceptedOperation {
+export type OperationSelectorValidationErrorCode = "invalid_binding_id" | "invalid_operation_id";
+
+export type OperationSelectorValidationResult =
+  | { readonly ok: true; readonly value: OperationSelector }
+  | { readonly ok: false; readonly code: OperationSelectorValidationErrorCode };
+
+export interface AcceptedOperationReceipt {
   readonly operationId: string;
-  readonly state: "accepted";
+  readonly accepted: true;
 }
 
 export type PublicOperationStatus =
@@ -97,7 +102,10 @@ export type PublicOperationStatus =
     };
 
 export interface HostedApiBoundary {
-  submit(context: ApiCallContext, command: SubmitMutationCommand): Promise<AcceptedOperation>;
+  submit(
+    context: ApiCallContext,
+    command: SubmitMutationCommand,
+  ): Promise<AcceptedOperationReceipt>;
   status(context: ApiCallContext, command: StatusCommand): Promise<PublicOperationStatus>;
   cancel(context: ApiCallContext, command: CancelCommand): Promise<PublicOperationStatus>;
 }
@@ -108,6 +116,24 @@ export function isValidOpaqueId(value: string): boolean {
 
 export function isTerminalOperationStatus(status: PublicOperationStatus): boolean {
   return status.kind === "terminal";
+}
+
+export function validateOperationSelector(
+  command: OperationSelector,
+): OperationSelectorValidationResult {
+  if (!isValidOpaqueId(command.bindingId)) {
+    return { ok: false, code: "invalid_binding_id" };
+  }
+  if (!isValidOpaqueId(command.operationId)) {
+    return { ok: false, code: "invalid_operation_id" };
+  }
+  return {
+    ok: true,
+    value: {
+      bindingId: command.bindingId,
+      operationId: command.operationId,
+    },
+  };
 }
 
 export function validateSubmission(
