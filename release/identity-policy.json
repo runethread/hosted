@@ -33,7 +33,7 @@
     ],
     "generated_runtime_types_workerd": "1.20260907.1",
     "generated_types_sha256": "d67a9e9d72dd0d155fcfd187a64d83ab062db80f20b585dfa36904ee0c778b44",
-    "wrangler_config_sha256": "156271834722bc94f4382c91bf7450d24e9ff5766cc11560babb23628f55ce45"
+    "wrangler_config_sha256": "5edbb90b6d53027f4e24ed2589c43b3eee7638f6d1bc016179bbdd8a879eb039"
   },
   "build": {
     "node": "24.20.0",
@@ -48,7 +48,14 @@
       "--x-provision=false",
       "--x-auto-create=false"
     ],
-    "expected_artifacts": {}
+    "deploy_artifact_paths": [
+      "index.js"
+    ],
+    "dry_run_auxiliary_paths": [
+      "README.md",
+      "index.js.map"
+    ],
+    "expected_deploy_artifacts": {}
   },
   "protocols": {
     "hosted_api": "not_implemented",
