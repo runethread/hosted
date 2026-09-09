@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "runethread-provider-do-proof",
+  "main": "provider-proof/do_provider_worker.ts",
+  "compatibility_date": "2026-09-09",
+  "compatibility_flags": [
+    "no_nodejs_compat",
+    "no_nodejs_compat_v2"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PROOF_DO",
+        "class_name": "ProviderProofDO"
+      }
+    ]
+  },
+  "exports": {
+    "ProviderProofDO": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
+}
