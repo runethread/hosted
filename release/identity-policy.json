@@ -2,8 +2,15 @@
   "schema": 1,
   "component": "runethread/hosted",
   "publication_enabled": false,
+  "versioning": {
+    "scheme": "semver-2.0.0",
+    "authority_repository": "runethread/core",
+    "authority_git_commit": "60a5f5c83ac740e26d4f11db99de66fa7b8c914d",
+    "authority_path": "docs/runethread/VERSIONING.md",
+    "authority_git_blob": "d4c49b67892cfe769a7b25adf3f4efb21d95ed9a",
+    "release_identifier_prefix": "v"
+  },
   "release_version": {
-    "format": "^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
     "ci_reserved": "v0.0.0-ci"
   },
   "source": {
