@@ -20,4 +20,4 @@ The admitted developer toolchain is exact and lockfile-based. Validation runs th
 
 ADR-026 establishes **PolyForm Perimeter 1.0.1 as the prospective Hosted implementation default**; the repository's earlier MIT grants remain historical and are preserved in [`LICENSE-MIT`](LICENSE-MIT). Hosted has no prospective MIT interoperability exception of its own. See [`LICENSING.md`](LICENSING.md).
 
-The next separate gate is Hosted release identity and release-pipeline definition. This repository state does not authorize deployment.
+The non-publishing release-identity baseline is established in [`release/identity-policy.json`](release/identity-policy.json) and consumes the project-wide ADR-028/Core versioning authority. The next implementation gate is the authenticated transport-neutral request/status/cancel boundary plus caller/repository authorization. This repository state does not authorize release publication or production deployment.

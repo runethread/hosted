@@ -1,0 +1,97 @@
+{
+  "schema": 1,
+  "component": "runethread/hosted",
+  "publication_enabled": false,
+  "versioning": {
+    "scheme": "semver-2.0.0",
+    "authority_repository": "runethread/core",
+    "authority_git_commit": "60a5f5c83ac740e26d4f11db99de66fa7b8c914d",
+    "authority_path": "docs/runethread/VERSIONING.md",
+    "authority_git_blob": "d4c49b67892cfe769a7b25adf3f4efb21d95ed9a",
+    "release_identifier_prefix": "v"
+  },
+  "release_version": {
+    "ci_reserved": "v0.0.0-ci"
+  },
+  "source": {
+    "repository": "runethread/hosted",
+    "release_branch": "main",
+    "require_clean_tracked_tree": true,
+    "require_protected_validate": true
+  },
+  "core": {
+    "runtime_release": "v0.9.0",
+    "runtime_git_commit": "7f5cf86f23604426c7e8f69086fdcbe27fb86226",
+    "contract_release": "v0.9.0",
+    "contract_version": 9,
+    "repository_format": 2,
+    "memory_schema": 1,
+    "index_format": 2,
+    "trust_lock_version": 2,
+    "bootstrap_protocol": 1,
+    "bootstrap_verifier": "v0.6.0"
+  },
+  "worker": {
+    "wrangler": "4.129.1",
+    "compatibility_date": "2026-09-09",
+    "compatibility_flags": [
+      "no_nodejs_compat",
+      "no_nodejs_compat_v2"
+    ],
+    "generated_runtime_types_workerd": "1.20260907.1",
+    "generated_types_sha256": "d67a9e9d72dd0d155fcfd187a64d83ab062db80f20b585dfa36904ee0c778b44",
+    "wrangler_config_sha256": "5edbb90b6d53027f4e24ed2589c43b3eee7638f6d1bc016179bbdd8a879eb039"
+  },
+  "build": {
+    "node": "24.20.0",
+    "npm": "11.19.0",
+    "package_lock_sha256": "dafea88d811a42ccb96a6b1f4cee69212732adb4f8e7b28ab4efb7997db13eb2",
+    "node_env": "production",
+    "wrangler_args": [
+      "deploy",
+      "--dry-run",
+      "--config",
+      "wrangler.jsonc",
+      "--x-provision=false",
+      "--x-auto-create=false"
+    ],
+    "deploy_artifact_paths": [
+      "index.js"
+    ],
+    "dry_run_auxiliary_paths": [
+      "README.md"
+    ],
+    "expected_deploy_artifacts": {
+      "index.js": "905ab7b489f99893812b422862dc8dd527790fe9cdd1a9f730e2514d552bf0cf"
+    }
+  },
+  "protocols": {
+    "hosted_api": "not_implemented",
+    "repository_runtime": "not_implemented",
+    "candidate_envelope": "not_implemented",
+    "finalization_evidence": "not_implemented",
+    "audit_conformance": "not_implemented",
+    "terminal_success_verification": "not_implemented",
+    "terminal_disposition": "not_implemented",
+    "safety_journal": "not_implemented",
+    "publication": "not_implemented",
+    "reconciliation": "not_implemented"
+  },
+  "capabilities": {
+    "authenticated_api": false,
+    "repository_binding": false,
+    "durable_state": false,
+    "semantic_mutation": false,
+    "publication": false,
+    "deployment": false
+  },
+  "distribution": {
+    "required_files_sha256": {
+      "LICENSE": "bb1d1de338bdbe282f151bf54d6bb6ad98ad37b9592539461fb51ff4bcd4e1c3",
+      "LICENSE-MIT": "273538c6ad97c94dc4230b1b66211a1ebf2769d86fa0bc93cbe2d6670eca88bd",
+      "LICENSE-APACHE-2.0": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+      "LICENSING.md": "2e24408e4bd928115148b1c82afde94547af6e250b427fe2c0b5b8357b6d53aa",
+      "THIRD_PARTY_NOTICES.md": "0bf7a5673ef4e293106453896d0fa826aef2ed1903589cd39590e44604657bcb"
+    }
+  }
+}

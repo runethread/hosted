@@ -33,8 +33,10 @@ TRACKED_FILES = (
     "docs/ENGINEERING_PROCESS.md",
     "package.json",
     "package-lock.json",
+    "release/identity-policy.json",
     "scripts/check_development_policy.py",
     "scripts/check_development_policy_test.py",
+    "scripts/release_identity.mjs",
     "src/index.ts",
     "test/index.test.ts",
     "test/tsconfig.json",
@@ -53,6 +55,84 @@ LICENSING_POLICY_SHA256 = "2e24408e4bd928115148b1c82afde94547af6e250b427fe2c0b5b
 APACHE_2_LICENSE_SHA256 = "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
 THIRD_PARTY_NOTICES_SHA256 = "0bf7a5673ef4e293106453896d0fa826aef2ed1903589cd39590e44604657bcb"
 PACKAGE_LOCK_SHA256 = "dafea88d811a42ccb96a6b1f4cee69212732adb4f8e7b28ab4efb7997db13eb2"
+RELEASE_IDENTITY_GIT_BLOBS = {
+    "release/identity-policy.json": "19c3f087817f92468c4a7bf552f634ee0a06c194",
+    "scripts/release_identity.mjs": "6751380c8a7230eb7c0be1d0710fbb38ed894e81",
+}
+RELEASE_VERSIONING_IDENTITY = {
+    "scheme": "semver-2.0.0",
+    "authority_repository": "runethread/core",
+    "authority_git_commit": "60a5f5c83ac740e26d4f11db99de66fa7b8c914d",
+    "authority_path": "docs/runethread/VERSIONING.md",
+    "authority_git_blob": "d4c49b67892cfe769a7b25adf3f4efb21d95ed9a",
+    "release_identifier_prefix": "v",
+}
+RELEASE_CORE_IDENTITY = {
+    "runtime_release": "v0.9.0",
+    "runtime_git_commit": "7f5cf86f23604426c7e8f69086fdcbe27fb86226",
+    "contract_release": "v0.9.0",
+    "contract_version": 9,
+    "repository_format": 2,
+    "memory_schema": 1,
+    "index_format": 2,
+    "trust_lock_version": 2,
+    "bootstrap_protocol": 1,
+    "bootstrap_verifier": "v0.6.0",
+}
+RELEASE_WORKER_IDENTITY = {
+    "wrangler": "4.129.1",
+    "compatibility_date": "2026-09-09",
+    "compatibility_flags": ["no_nodejs_compat", "no_nodejs_compat_v2"],
+    "generated_runtime_types_workerd": "1.20260907.1",
+    "generated_types_sha256": "d67a9e9d72dd0d155fcfd187a64d83ab062db80f20b585dfa36904ee0c778b44",
+    "wrangler_config_sha256": "5edbb90b6d53027f4e24ed2589c43b3eee7638f6d1bc016179bbdd8a879eb039",
+}
+RELEASE_BUILD_IDENTITY = {
+    "node": "24.20.0",
+    "npm": "11.19.0",
+    "package_lock_sha256": PACKAGE_LOCK_SHA256,
+    "node_env": "production",
+    "wrangler_args": [
+        "deploy",
+        "--dry-run",
+        "--config",
+        "wrangler.jsonc",
+        "--x-provision=false",
+        "--x-auto-create=false",
+    ],
+    "deploy_artifact_paths": ["index.js"],
+    "dry_run_auxiliary_paths": ["README.md"],
+    "expected_deploy_artifacts": {
+        "index.js": "905ab7b489f99893812b422862dc8dd527790fe9cdd1a9f730e2514d552bf0cf"
+    },
+}
+RELEASE_PROTOCOL_IDENTITIES = {
+    "hosted_api": "not_implemented",
+    "repository_runtime": "not_implemented",
+    "candidate_envelope": "not_implemented",
+    "finalization_evidence": "not_implemented",
+    "audit_conformance": "not_implemented",
+    "terminal_success_verification": "not_implemented",
+    "terminal_disposition": "not_implemented",
+    "safety_journal": "not_implemented",
+    "publication": "not_implemented",
+    "reconciliation": "not_implemented",
+}
+RELEASE_CAPABILITIES = {
+    "authenticated_api": False,
+    "repository_binding": False,
+    "durable_state": False,
+    "semantic_mutation": False,
+    "publication": False,
+    "deployment": False,
+}
+RELEASE_DISTRIBUTION_IDENTITIES = {
+    "LICENSE": PERIMETER_LICENSE_SHA256,
+    "LICENSE-MIT": HISTORICAL_MIT_LICENSE_SHA256,
+    "LICENSE-APACHE-2.0": APACHE_2_LICENSE_SHA256,
+    "LICENSING.md": LICENSING_POLICY_SHA256,
+    "THIRD_PARTY_NOTICES.md": THIRD_PARTY_NOTICES_SHA256,
+}
 
 NODE_VERSION = "24.20.0"
 NPM_VERSION = "11.19.0"
@@ -66,7 +146,8 @@ EXPECTED_SCRIPTS = {
     "types:check": "wrangler types --check",
     "typecheck": "tsc --noEmit && tsc -p test/tsconfig.json --noEmit",
     "test": "vitest run",
-    "check": "npm run types:check && npm run typecheck && npm test",
+    "release:verify-ci": "node scripts/release_identity.mjs --mode ci --version v0.0.0-ci",
+    "check": "npm run types:check && npm run typecheck && npm test && npm run release:verify-ci",
 }
 
 # Exact byte tripwires for the current non-operational shell/toolchain gate.
@@ -74,7 +155,7 @@ EXPECTED_SCRIPTS = {
 TOOLCHAIN_SURFACE_SHA256 = {
     ".gitattributes": "fdf103a524864b292f70b2f1bb3013d14964036fa2da47c90cba1232baa0054a",
     ".nvmrc": "5b9d0e73029969ae9000117cb877f17bb9841c1279bfe8024e294acfcf017800",
-    "package.json": "c805df3ba473aad27ba59ec29567a3d63ff44f988baf8d8b4eff5379f25685ca",
+    "package.json": "7167e5c7f333d716ea43e8b492a110283312d57416893bc7d090c77c4cfe9aa3",
     "package-lock.json": PACKAGE_LOCK_SHA256,
     "src/index.ts": "e705ae5df6f90d4ac2e0c17205b9aa8435161403ced8fbcbcc52614580522882",
     "test/index.test.ts": "242591d0b8356583fca337fec0ca98abe019bf599da2e02b33488851331106f6",
@@ -82,7 +163,7 @@ TOOLCHAIN_SURFACE_SHA256 = {
     "tsconfig.json": "329463c9460980c0cbe9a46ed658cbc341375089d48632a8f73c42affde7b03e",
     "vitest.config.ts": "f9ce78ff32af4bf1dc236554849a2d3f7313f14eefaf0051e7eaf642d8e4e701",
     "worker-configuration.d.ts": "d67a9e9d72dd0d155fcfd187a64d83ab062db80f20b585dfa36904ee0c778b44",
-    "wrangler.jsonc": "156271834722bc94f4382c91bf7450d24e9ff5766cc11560babb23628f55ce45",
+    "wrangler.jsonc": "5edbb90b6d53027f4e24ed2589c43b3eee7638f6d1bc016179bbdd8a879eb039",
 }
 
 # Secondary licensing/governance entrypoints are exact-locked. These Git blob
@@ -90,13 +171,13 @@ TOOLCHAIN_SURFACE_SHA256 = {
 # independently SHA-256 locked. Exact-head review is still required because a
 # PR can modify this guard and its expectations together.
 LICENSING_AUTHORITY_GIT_BLOBS = {
-    "README.md": "09a51eb6a741f535aafd2ac001afaa80142b929e",
-    "AGENTS.md": "c4ca7f3d5a040343c61c92d19528d33c9beead80",
-    "docs/CURRENT_MILESTONE.md": "03589f1c7641e1bd9aaab3334ef8e41bb3de0658",
-    "docs/DEVELOPMENT_PIPELINE.md": "42574faeef46e42a951ba9a83eab7b4a9dcd7a67",
+    "README.md": "aa872d548ec2a675def61645a3603390a092b49f",
+    "AGENTS.md": "c8df303ca14b57ecc22b79d2a46f97d4db9f309a",
+    "docs/CURRENT_MILESTONE.md": "c45c926a60c81201e1161c873d67509c58706963",
+    "docs/DEVELOPMENT_PIPELINE.md": "d72f89483478242ba11759ac61f27a1bec196dd9",
     "docs/ENGINEERING_PROCESS.md": "d794ae76136e48e5e920bcb39e5e8f5d24534e60",
     "docs/ARCHITECTURE_BASELINE.md": "5a2576b62da1843dc5c6f810e5ca7528c0530687",
-    ".github/pull_request_template.md": "553376106373fb5e988e8bd04eb59b320b215d48",
+    ".github/pull_request_template.md": "2883de95af5d586c4c0096ecdd870f34dadf9e7a",
 }
 
 LICENSING_AUTHORITY_PATHS = frozenset(
@@ -105,7 +186,7 @@ LICENSING_AUTHORITY_PATHS = frozenset(
 LICENSING_GUARD_IMPLEMENTATION_PATHS = frozenset(
     {"scripts/check_development_policy.py", "scripts/check_development_policy_test.py"}
 )
-NON_AUTHORITY_LICENSE_METADATA_PATHS = frozenset({"package-lock.json"})
+NON_AUTHORITY_LICENSE_METADATA_PATHS = frozenset({"package-lock.json", "release/identity-policy.json"})
 THIRD_PARTY_DISTRIBUTION_PATHS = frozenset(
     {"LICENSE-APACHE-2.0", "THIRD_PARTY_NOTICES.md", "worker-configuration.d.ts"}
 )
@@ -241,6 +322,80 @@ def exact_file_errors(root: Path, expected: dict[str, str], label: str) -> list[
             errors.append(
                 f"{label} file {relative} must match exact reviewed bytes: expected sha256 {digest}, got {actual}"
             )
+    return errors
+
+
+def release_identity_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
+    errors: list[str] = []
+    for relative, expected_blob in RELEASE_IDENTITY_GIT_BLOBS.items():
+        if relative not in tracked_relatives:
+            errors.append(f"required release identity surface missing: {relative}")
+            continue
+        try:
+            data = (root / relative).read_bytes()
+        except OSError as exc:
+            errors.append(f"cannot read release identity surface {relative}: {exc}")
+            continue
+        actual_blob = git_blob_sha1(data)
+        if actual_blob != expected_blob:
+            errors.append(
+                f"{relative} must match exact reviewed release identity bytes: "
+                f"expected git blob {expected_blob}, got {actual_blob}"
+            )
+
+    policy_path = root / "release/identity-policy.json"
+    try:
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        errors.append(f"cannot parse release identity policy: {exc}")
+        return errors
+    if not isinstance(policy, dict):
+        errors.append("release identity policy root must be an object")
+        return errors
+
+    expected_root = {
+        "schema",
+        "component",
+        "publication_enabled",
+        "versioning",
+        "release_version",
+        "source",
+        "core",
+        "worker",
+        "build",
+        "protocols",
+        "capabilities",
+        "distribution",
+    }
+    if set(policy) != expected_root:
+        errors.append("release identity policy root keys must match the reviewed baseline")
+    if policy.get("schema") != 1 or policy.get("component") != "runethread/hosted":
+        errors.append("release identity policy schema/component mismatch")
+    if policy.get("publication_enabled") is not False:
+        errors.append("release identity baseline must remain non-publishing")
+    if policy.get("versioning") != RELEASE_VERSIONING_IDENTITY:
+        errors.append("release versioning authority must match the immutable ADR-028/Core VERSIONING.md pin")
+    if policy.get("release_version") != {"ci_reserved": "v0.0.0-ci"}:
+        errors.append("release CI identity must remain exactly v0.0.0-ci")
+    if policy.get("source") != {
+        "repository": "runethread/hosted",
+        "release_branch": "main",
+        "require_clean_tracked_tree": True,
+        "require_protected_validate": True,
+    }:
+        errors.append("release source eligibility policy must match the reviewed protected-main baseline")
+    if policy.get("core") != RELEASE_CORE_IDENTITY:
+        errors.append("release Core/runtime/contract identity must match the immutable reviewed baseline")
+    if policy.get("worker") != RELEASE_WORKER_IDENTITY:
+        errors.append("release Worker/provider identity must match the reviewed baseline")
+    if policy.get("build") != RELEASE_BUILD_IDENTITY:
+        errors.append("release build/artifact identity must match the reviewed dry-run baseline")
+    if policy.get("protocols") != RELEASE_PROTOCOL_IDENTITIES:
+        errors.append("unimplemented Hosted protocols must remain explicit not_implemented identities")
+    if policy.get("capabilities") != RELEASE_CAPABILITIES:
+        errors.append("unimplemented Hosted capabilities must remain false")
+    if policy.get("distribution") != {"required_files_sha256": RELEASE_DISTRIBUTION_IDENTITIES}:
+        errors.append("release distribution notice identities must match current licensing policy")
     return errors
 
 
@@ -385,6 +540,11 @@ def wrangler_errors(path: Path) -> list[str]:
         "compatibility_flags": ["no_nodejs_compat", "no_nodejs_compat_v2"],
         "workers_dev": False,
         "preview_urls": False,
+        "minify": False,
+        "upload_source_maps": False,
+        "find_additional_modules": False,
+        "send_metrics": False,
+        "dependencies_instrumentation": {"enabled": False},
     }
     if config != expected:
         return [
@@ -623,6 +783,7 @@ def check_repository(root: Path) -> list[str]:
 
     errors.extend(package_manifest_errors(root, tracked_relatives))
     errors.extend(exact_file_errors(root, TOOLCHAIN_SURFACE_SHA256, "toolchain/shell"))
+    errors.extend(release_identity_errors(root, tracked_relatives))
     errors.extend(wrangler_errors(root / "wrangler.jsonc"))
     errors.extend(generated_types_errors(root / "worker-configuration.d.ts"))
     errors.extend(secret_path_errors(project_paths))
