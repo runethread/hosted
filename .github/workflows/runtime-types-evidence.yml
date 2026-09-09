@@ -33,6 +33,6 @@ jobs:
           test "$(npm --version)" = "11.19.0"
           npm ci --ignore-scripts --no-audit --no-fund
           npx wrangler types worker-configuration.d.ts
-          grep -F 'declare module "cloudflare:workers"' worker-configuration.d.ts >/dev/null
+          grep -E "declare module ['\"]cloudflare:workers['\"]" worker-configuration.d.ts >/dev/null
           printf 'RUNTIME_TYPES_SHA256=%s\n' "$(sha256sum worker-configuration.d.ts | awk '{print $1}')"
           printf 'RUNTIME_TYPES_BYTES=%s\n' "$(wc -c < worker-configuration.d.ts | tr -d ' ')"
