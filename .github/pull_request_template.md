@@ -7,9 +7,9 @@
 Check every class that applies.
 
 - [ ] Development infrastructure / CI / engineering policy
+- [ ] Dependency / TypeScript / Node / Cloudflare toolchain
 - [ ] Licensing / commercial model / source-use boundary
 - [ ] Documentation-only / non-normative
-- [ ] Dependency / TypeScript / Node / Cloudflare toolchain
 - [ ] Hosted protocol / public API
 - [ ] Authentication / repository authorization
 - [ ] Durable Object state / SQLite schema / alarms
@@ -24,22 +24,34 @@ Check every class that applies.
 
 - Hosted base `main` SHA: `...`
 - Branch/head SHA reviewed: `...`
-- Core architecture SHA/tree verified: `...`
-- Active hosted ruleset / required checks + expected status-check source: `...`
+- Core invariant-authority commit verified: `...`
+- Core architecture/current ADR state verified: `...`
+- Active Hosted ruleset / required checks + expected status-check source: `...`
 - Current provider/toolchain documentation verified where relevant: `...`
+
+## Invariant impact
+
+<!-- Consume the canonical Core registry; do not copy invariant statements here. -->
+
+- Applicable invariant IDs: `...`
+- [ ] Each applicable invariant is unchanged, strengthened, or explicitly reopened under its owning governance process.
+- [ ] Provider/toolchain/version choices were not promoted into project invariants merely because they matter to this implementation.
+- [ ] Scope means applicability, not proof: Hosted-local evidence is provided where Core CI cannot prove the Hosted property.
 
 ## Scope-boundary decision
 
 - [ ] Every changed file belongs to the declared purpose.
 - [ ] Hosted code does not reimplement Core memory semantics.
-- [ ] No provider resource, permission, secret, deployment, or production capability was added implicitly.
-- [ ] If scope changed materially, exploratory work was preserved and final work restarted from a clean verified base rather than hidden by force-push.
+- [ ] No provider resource, permission, secret, deployment, release, or production capability was added implicitly.
+- [ ] Temporary construction/evidence workflows or write credentials are absent from the final candidate.
+- [ ] If scope changed materially, exploratory work was preserved and final work restarted/reviewed from a clean verified boundary rather than hidden by force-push.
 
 ## Impact matrix
 
 | Surface | Impact / evidence |
 | --- | --- |
 | Development pipeline / required checks | |
+| Dependency classification / lockfile | |
 | Licensing / commercial model | |
 | Hosted request/status/cancel protocol | |
 | Authentication / caller authorization | |
@@ -59,9 +71,7 @@ Check every class that applies.
 
 ## Failure modes / adversarial review
 
-<!-- Crashes, lost responses, duplicates, retries, stale generation, PITR, cancellation races, permission loss, privacy change, ref races, ambiguous publication, provider outage, version skew, etc. -->
-
-For material development-pipeline/repository-policy/CI-self-protection changes and architecture/protocol/security/state/licensing changes, confirm the full exact-head attack was completed and **all material findings were enumerated before corrections**.
+For material pipeline/repository-policy/dependency/toolchain/CI-self-protection changes and architecture/protocol/security/state/release/licensing changes, confirm the full exact-head attack was completed and **all material findings were enumerated before corrections**.
 
 ## Licensing / commercial-model gate
 
@@ -70,15 +80,18 @@ For material development-pipeline/repository-policy/CI-self-protection changes a
 - [ ] Historical MIT grants remain intact; this change does not claim to revoke, narrow, or rewrite rights already granted for previously distributed bytes.
 - [ ] User-authored memories, projects, imports, attachments, and other user-owned data are not treated as Runethread-licensed software merely because Hosted processes them.
 - [ ] No material third-party Hosted source is merged without the explicit inbound-rights policy required by ADR-026 and `LICENSING.md`.
-- [ ] No Hosted release/artifact is distributed, or packaging is verified to deliver the applicable Perimeter terms or URL + every `Required Notice:` and all notices required by bundled Core/third-party material.
+- [ ] Third-party dependencies are classified as development-only, metadata, bundled/deployed, vendored, or actually distributed; notice/rights obligations are evaluated for the real surface.
+- [ ] No Hosted release/artifact is distributed, or packaging is verified to deliver the applicable Perimeter terms or URL + every `Required Notice:` and all notices required by actually bundled/distributed Core/third-party material.
 - [ ] Commercial-use / redistribution implications were reviewed when this change affects licensing or source distribution.
 
 ## Dependency/toolchain gate
 
 - [ ] No dependency/toolchain change, or authoritative current support docs were rechecked.
-- [ ] `package.json` + lockfile are updated together when dependencies exist.
-- [ ] Direct versions are exact and the package is non-publishable.
-- [ ] Dependency/advisory/license and platform implications were reviewed.
+- [ ] `package.json` + `package-lock.json` are updated together when dependencies exist.
+- [ ] Direct versions are exact, Node/npm identities are explicit, and the package is non-publishable.
+- [ ] Clean install disables lifecycle scripts in required CI.
+- [ ] Dependency advisory/license/platform implications were reviewed.
+- [ ] Generated Worker Env plus compatibility-locked runtime types are committed and `wrangler types --check` passes.
 
 ## Mandatory pipeline on exact head
 
@@ -86,7 +99,7 @@ For material development-pipeline/repository-policy/CI-self-protection changes a
 - [ ] policy guard compiles
 - [ ] policy guard self-tests pass
 - [ ] policy guard passes
-- [ ] required TypeScript/Workers/cross-platform tests pass when applicable
+- [ ] Linux/macOS/Windows clean install + generated-type check + TypeScript + Workers-runtime tests pass
 - [ ] aggregate `validate` passes on exact head
 
 Evidence / exact SHA:
@@ -94,7 +107,7 @@ Evidence / exact SHA:
 ## Review hygiene
 
 - [ ] Canonical changed-file list and patch reviewed.
-- [ ] Actions are full-SHA pinned; validation is read-only.
+- [ ] Actions are full-SHA pinned; required validation is read-only.
 - [ ] For workflow/guard/policy changes, green CI was not treated as self-attestation; the exact-head workflow/guard patch was independently reviewed.
 - [ ] Comments/reviews/threads checked.
 - [ ] Base movement rechecked.

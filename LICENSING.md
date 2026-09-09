@@ -24,7 +24,11 @@ Runethread's software licenses do not grant Runethread ownership or software-lic
 
 ## Distribution notices
 
-Any post-transition Hosted source or build artifact distributed under Perimeter must provide recipients the applicable Perimeter terms or URL and every `Required Notice:` supplied with the software. Bundled Core or third-party material retains its own applicable notice obligations; satisfying those obligations does not create a prospective MIT exception for Hosted source. A Hosted release/distribution pipeline must prove the required notice material is delivered before publishing an artifact.
+Any post-transition Hosted source or build artifact distributed under Perimeter must provide recipients the applicable Perimeter terms or URL and every `Required Notice:` supplied with the software. Bundled Core or third-party material retains its own applicable notice obligations; satisfying those obligations does not create a prospective MIT exception for Hosted source.
+
+The repository currently distributes `worker-configuration.d.ts`, whose generated runtime declaration portion contains Cloudflare and Microsoft material under the Apache License 2.0. Its upstream notices remain embedded in that file. [`LICENSE-APACHE-2.0`](LICENSE-APACHE-2.0) provides recipients the Apache 2.0 license copy for that material, and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) records the scoped third-party boundary. Those files do not relicense Runethread-authored Hosted source.
+
+A future Hosted release/distribution pipeline must prove the required notice material for every actually distributed source/build surface before publishing an artifact.
 
 ## Commercial model
 

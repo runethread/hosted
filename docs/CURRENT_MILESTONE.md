@@ -1,82 +1,62 @@
-# Current milestone — Hosted pre-runtime licensing gate
+# Current milestone — Hosted release-identity baseline
 
-Status: **In progress**
+Status: **Next gate after the toolchain/shell merge**
 
-## Goal
+## Verified baseline after this slice
 
-Complete the protected ADR-026 licensing transition for `runethread/hosted` without admitting runtime/provider source, then move to the separately reviewed TypeScript/Cloudflare toolchain and non-operational Worker shell.
+The protected Hosted baseline now includes the reviewed developer toolchain and a fail-closed non-operational Worker shell:
 
-Architecture authority remains the accepted Phase 2.6 design in `runethread/core`. The original Hosted bootstrap pin is Core commit `22995a7cf7d1c6c0f4ce548fd83667468b356f42` / tree `ef1d3c6a4e8a783cc0657b15a61703a5fa52d6d9` and ADR-012 through ADR-025. ADR-026 was accepted later and governs the licensing/commercial-model transition.
+- Node `24.20.0` and npm `11.19.0` are the exact admitted developer/CI identities;
+- direct development dependencies are exact: Wrangler `4.129.1`, TypeScript `5.8.3`, Vitest `4.1.11`, and `@cloudflare/vitest-plugin` `1.1.5`;
+- `package.json` and `package-lock.json` are committed together and the package is non-publishable;
+- generated Worker environment and runtime types are committed from `wrangler types`, compatibility-locked by the Worker date/flags, and checked for drift;
+- CI clean-installs with lifecycle scripts disabled and runs the supported Workers-runtime test integration on Linux, macOS, and Windows;
+- the Worker shell returns HTTP 503 / `not_operational` and has no provider binding, route, secret, persistence, mutation authority, publication authority, deploy script, or production resource;
+- validation remains read-only and the protected `validate` aggregate remains the merge check;
+- no Hosted release or deployment is authorized by the toolchain/shell merge.
 
-## Completed prerequisite
+Architecture authority remains the accepted Phase 2.6 design in `runethread/core`. The historical Hosted bootstrap pin remains documented in `ARCHITECTURE_BASELINE.md`, while current substantive work must also consume the protected Core invariant registry and later accepted ADRs from freshly verified live state.
 
-The initial Hosted repository/bootstrap is complete and merged on protected `main`:
+## Applicable Runethread invariants
 
-- Hosted bootstrap `main`: `ca2282eafca03573ac9c88277125cc6973234959`;
-- tree: `1e64bf1c3cf9d264adc227e421f016e4ed5d6c11`;
-- active protected-main ruleset requires PR + strict `validate` from GitHub Actions and blocks destructive ref updates;
-- no Worker/runtime/provider resources, secrets, deployment, GitHub App, or publication capability exist.
+The toolchain/shell baseline consumes, without copying, the canonical Core invariant authority. The directly relevant active IDs are:
 
-Core's ADR-026 transition and the protected public-memory-template scoped MIT notice gate are also complete.
+- `RT-ARCH-001` — provider-specific execution and dependencies stay outside Core;
+- `RT-ARCH-002` — correctness-relevant component coupling uses explicit contracts or immutable identities rather than hidden internals;
+- `RT-GOV-001` — material choices are objective/evidence-driven and simpler alternatives are considered;
+- `RT-REL-001` — hosted/released execution must eventually bind every correctness-relevant component/contract/protocol identity immutably;
+- `RT-SEM-001` — Hosted does not become a second memory-mutation semantics implementation.
 
-## This slice — ADR-026 Hosted transition
+The Node/TypeScript/Wrangler/Cloudflare choices are current Hosted implementation decisions, not permanent project invariants.
 
-This change must:
+ADR-026 remains the licensing authority for this work: Hosted has no prospective MIT exception, Core's exact MIT interoperability boundary does not automatically extend into Hosted, historical grants remain intact, and user-owned data remains outside Runethread's software-license grants.
 
-1. replace the root bootstrap MIT default with the exact reviewed PolyForm Perimeter 1.0.1 terms and Required Notice for prospective Runethread-owned Hosted work;
-2. preserve the exact historical Hosted MIT root license as `LICENSE-MIT`;
-3. add a concise Hosted licensing authority explaining the prospective Perimeter default, historical MIT boundary, absence of any prospective Hosted MIT exception, user-data boundary, commercial flexibility, and inbound-rights prerequisite;
-4. update process/PR/agent documentation so ADR-026 is the settled licensing decision rather than a pending choice;
-5. mechanically require the exact legal texts and licensing authority through the development-policy guard and negative tests;
-6. keep the existing dependency-free validation workflow unchanged;
-7. preserve the bootstrap tracked-file allowlist except for the explicit licensing files admitted by this transition;
-8. pass exact-head CI and a complete zero-correction adversarial review before protected merge.
+## Immediate milestone — release identity and release pipeline
 
-## Explicit non-goals
+Before auth/API implementation begins, define and independently review the Hosted release-identity baseline. It must establish at least:
 
-This licensing slice does NOT:
+1. what exact source/ref/tree can become a Hosted release;
+2. how Hosted version identity is represented and verified;
+3. which exact Core runtime, memory contract, candidate/protocol, journal/evidence, and provider/configuration identities a release relies on;
+4. how build inputs and produced artifacts are reproducibly identified;
+5. how applicable source/build notices are proven for any artifact that is actually distributed;
+6. how producing/verifying a release is kept distinct from deploying it;
+7. how unsupported or floating identity combinations fail closed.
 
-- add a Worker or hosted runtime source;
-- add TypeScript/Node/Cloudflare dependencies;
-- create `package.json`, `package-lock.json`, or `wrangler.jsonc`;
-- create a Durable Object namespace/schema;
-- create R2/evidence storage;
-- create a GitHub App/webhook;
-- store a secret;
-- expose an authenticated mutation API;
-- implement the safety journal;
-- implement finalizer/auditor/verifier/publisher code;
-- implement or duplicate Core memory semantics;
-- publish a Hosted release;
-- deploy anything.
+That gate must remain non-deploying. It does not authorize a production route, secret, Durable Object, R2 bucket, GitHub App, mutation endpoint, publication capability, or user traffic.
 
-## Licensing invariants
+## Dependency/distribution classification
 
-- Post-transition Runethread-owned Hosted material is PolyForm Perimeter 1.0.1 by default to the extent the applicable licensor controls the necessary rights.
-- Hosted has **no prospective MIT exception** unless a later explicit reviewed decision creates one.
-- Core's exact MIT interoperability boundary does not automatically extend into Hosted.
-- Historical Hosted MIT grants remain intact; the transition does not revoke or rewrite previously granted rights.
-- User-authored memories/projects/imports/attachments/data remain outside Runethread's software-license grants.
-- Material third-party source contributions require an explicit inbound-rights policy before merge if Runethread intends to preserve separate commercial licensing flexibility.
-- GitHub organization/repository ownership is not treated as automatic copyright ownership.
+The current npm graph is development-only. `node_modules` is ignored and is not copied into the repository. The lockfile records exact third-party package identities/metadata but does not vendor those package contents.
 
-## Exit criteria
+Future dependency work must classify each relevant dependency as development-only, referenced metadata, bundled/deployed code, vendored source, or material included in a downloadable release artifact. A change that moves third-party material into a bundled, vendored, or distributed surface must pass the corresponding notice/rights gate before release.
 
-- exact licensing PR passes `validate`;
-- canonical diff contains only declared licensing/governance/policy files;
-- exact PolyForm Perimeter and historical MIT texts are mechanically locked;
-- the policy guard rejects missing/drifted licensing authority and stale current-MIT claims;
-- no runtime/provider/toolchain file is admitted;
-- a fresh complete attack review of the exact final head requires zero corrections;
-- exact reviewed head is merged with expected-head protection;
-- post-merge `main` validation passes;
-- Core tracking issue records the Hosted licensing-transition boundary;
-- no provider resource or production deployment was created.
+## Next gates
 
-## Next gates after this merge
+1. Hosted release identity/release pipeline;
+2. authenticated transport-neutral request/status/cancel boundary and caller/repository authorization;
+3. sealed request persistence and the accepted ADR-014 through ADR-025 coordinator/evidence/publication sequence;
+4. private-repository rollout/recovery/security exit criteria;
+5. only then Phase 3 MCP integration work.
 
-1. introduce the reproducibly locked TypeScript/Cloudflare developer toolchain and a fail-closed non-operational Worker shell using current authoritative provider guidance;
-2. establish the independently reviewed Hosted release-identity/release-pipeline baseline while deployment remains disabled;
-3. only then begin auth/API and the accepted Phase 2.6 runtime implementation sequence.
-
-The licensing merge by itself authorizes none of those later implementation steps.
+Do not skip directly from this shell to auth/API or production deployment.

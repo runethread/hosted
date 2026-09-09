@@ -1,4 +1,4 @@
-# Node / Cloudflare tooling (introduced in a later reviewed slice)
+# Node / Cloudflare tooling
 node_modules/
 .wrangler/
 dist/

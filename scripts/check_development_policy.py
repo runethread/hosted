@@ -11,46 +11,92 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
-BOOTSTRAP_TRACKED_FILES = (
+TRACKED_FILES = (
     "AGENTS.md",
     "README.md",
     "LICENSE",
     "LICENSE-MIT",
+    "LICENSE-APACHE-2.0",
     "LICENSING.md",
+    "THIRD_PARTY_NOTICES.md",
     ".editorconfig",
     ".gitattributes",
     ".gitignore",
+    ".nvmrc",
     ".github/CODEOWNERS",
     ".github/dependabot.yml",
     ".github/pull_request_template.md",
     ".github/workflows/validate.yml",
     "docs/ARCHITECTURE_BASELINE.md",
-    "docs/ENGINEERING_PROCESS.md",
-    "docs/DEVELOPMENT_PIPELINE.md",
     "docs/CURRENT_MILESTONE.md",
+    "docs/DEVELOPMENT_PIPELINE.md",
+    "docs/ENGINEERING_PROCESS.md",
+    "package.json",
+    "package-lock.json",
     "scripts/check_development_policy.py",
     "scripts/check_development_policy_test.py",
+    "src/index.ts",
+    "test/index.test.ts",
+    "test/tsconfig.json",
+    "tsconfig.json",
+    "vitest.config.ts",
+    "worker-configuration.d.ts",
+    "wrangler.jsonc",
 )
 
-BOOTSTRAP_WORKFLOWS = (".github/workflows/validate.yml",)
-BOOTSTRAP_WORKFLOW_SHA256 = "52119d9fe135ff770243ae375bc16aa696b765106632ae2728857ca6e477823f"
+WORKFLOWS = (".github/workflows/validate.yml",)
+WORKFLOW_SHA256 = "3db585a413edb82a26af19ba166ea188d09af8f75ee7a0c396ab1b9f36abec35"
+DEPENDABOT_SHA256 = "72f781d2d2aba8161ef5cc6148c64ff9fa520239bab7e23de686282293b68cf9"
 PERIMETER_LICENSE_SHA256 = "bb1d1de338bdbe282f151bf54d6bb6ad98ad37b9592539461fb51ff4bcd4e1c3"
 HISTORICAL_MIT_LICENSE_SHA256 = "273538c6ad97c94dc4230b1b66211a1ebf2769d86fa0bc93cbe2d6670eca88bd"
-LICENSING_POLICY_SHA256 = "215b53b54af9c332f98de19a7cc50c84de568bac1ffc592bade30c106717b593"
+LICENSING_POLICY_SHA256 = "2e24408e4bd928115148b1c82afde94547af6e250b427fe2c0b5b8357b6d53aa"
+APACHE_2_LICENSE_SHA256 = "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+THIRD_PARTY_NOTICES_SHA256 = "0bf7a5673ef4e293106453896d0fa826aef2ed1903589cd39590e44604657bcb"
+PACKAGE_LOCK_SHA256 = "dafea88d811a42ccb96a6b1f4cee69212732adb4f8e7b28ab4efb7997db13eb2"
 
-# Secondary licensing/governance entrypoints are exact-locked for the current
-# dependency-free pre-runtime gate. These are Git blob object IDs, used only as
-# exact byte-change tripwires; the legal texts and central licensing authority
-# above remain independently SHA-256 locked. Exact-head review is still needed
-# because a PR can modify this guard and its expectations together.
+NODE_VERSION = "24.20.0"
+NPM_VERSION = "11.19.0"
+EXPECTED_DEV_DEPENDENCIES = {
+    "@cloudflare/vitest-plugin": "1.1.5",
+    "typescript": "5.8.3",
+    "vitest": "4.1.11",
+    "wrangler": "4.129.1",
+}
+EXPECTED_SCRIPTS = {
+    "types:check": "wrangler types --check",
+    "typecheck": "tsc --noEmit && tsc -p test/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "check": "npm run types:check && npm run typecheck && npm test",
+}
+
+# Exact byte tripwires for the current non-operational shell/toolchain gate.
+# These are implementation-gate identities, not permanent Runethread invariants.
+TOOLCHAIN_SURFACE_SHA256 = {
+    ".gitattributes": "fdf103a524864b292f70b2f1bb3013d14964036fa2da47c90cba1232baa0054a",
+    ".nvmrc": "5b9d0e73029969ae9000117cb877f17bb9841c1279bfe8024e294acfcf017800",
+    "package.json": "c805df3ba473aad27ba59ec29567a3d63ff44f988baf8d8b4eff5379f25685ca",
+    "package-lock.json": PACKAGE_LOCK_SHA256,
+    "src/index.ts": "e705ae5df6f90d4ac2e0c17205b9aa8435161403ced8fbcbcc52614580522882",
+    "test/index.test.ts": "242591d0b8356583fca337fec0ca98abe019bf599da2e02b33488851331106f6",
+    "test/tsconfig.json": "95d5e81f279f22af644f8bdf99935473bf19d037789e07116cbbdf5799fcdb60",
+    "tsconfig.json": "329463c9460980c0cbe9a46ed658cbc341375089d48632a8f73c42affde7b03e",
+    "vitest.config.ts": "f9ce78ff32af4bf1dc236554849a2d3f7313f14eefaf0051e7eaf642d8e4e701",
+    "worker-configuration.d.ts": "d67a9e9d72dd0d155fcfd187a64d83ab062db80f20b585dfa36904ee0c778b44",
+    "wrangler.jsonc": "156271834722bc94f4382c91bf7450d24e9ff5766cc11560babb23628f55ce45",
+}
+
+# Secondary licensing/governance entrypoints are exact-locked. These Git blob
+# object IDs are byte-change tripwires; the legal texts and LICENSING.md remain
+# independently SHA-256 locked. Exact-head review is still required because a
+# PR can modify this guard and its expectations together.
 LICENSING_AUTHORITY_GIT_BLOBS = {
-    "README.md": "f0585a8e46172e639c408881357acd8f934e6e00",
-    "AGENTS.md": "eadfc55c79169cdbf870deaef961eb3c6355ff24",
-    "docs/CURRENT_MILESTONE.md": "ac63f9a965ce377ff8633c8acc0e584b4953c4f4",
-    "docs/DEVELOPMENT_PIPELINE.md": "a2374bc52659b6597b76ec608aa18bdab8da0232",
-    "docs/ENGINEERING_PROCESS.md": "d0d59f1427f83b2fe9b775f1097a1a5c4a8a5de3",
+    "README.md": "09a51eb6a741f535aafd2ac001afaa80142b929e",
+    "AGENTS.md": "c4ca7f3d5a040343c61c92d19528d33c9beead80",
+    "docs/CURRENT_MILESTONE.md": "03589f1c7641e1bd9aaab3334ef8e41bb3de0658",
+    "docs/DEVELOPMENT_PIPELINE.md": "42574faeef46e42a951ba9a83eab7b4a9dcd7a67",
+    "docs/ENGINEERING_PROCESS.md": "d794ae76136e48e5e920bcb39e5e8f5d24534e60",
     "docs/ARCHITECTURE_BASELINE.md": "5a2576b62da1843dc5c6f810e5ca7528c0530687",
-    ".github/pull_request_template.md": "83d75e0a6653c36d9c46b1451bca0ebb07042c87",
+    ".github/pull_request_template.md": "553376106373fb5e988e8bd04eb59b320b215d48",
 }
 
 LICENSING_AUTHORITY_PATHS = frozenset(
@@ -58,6 +104,13 @@ LICENSING_AUTHORITY_PATHS = frozenset(
 )
 LICENSING_GUARD_IMPLEMENTATION_PATHS = frozenset(
     {"scripts/check_development_policy.py", "scripts/check_development_policy_test.py"}
+)
+NON_AUTHORITY_LICENSE_METADATA_PATHS = frozenset({"package-lock.json"})
+THIRD_PARTY_DISTRIBUTION_PATHS = frozenset(
+    {"LICENSE-APACHE-2.0", "THIRD_PARTY_NOTICES.md", "worker-configuration.d.ts"}
+)
+NON_AUTHORITY_LICENSE_TEXT_PATHS = (
+    NON_AUTHORITY_LICENSE_METADATA_PATHS | THIRD_PARTY_DISTRIBUTION_PATHS
 )
 
 LICENSING_REQUIRED_MARKERS = {
@@ -67,8 +120,18 @@ LICENSING_REQUIRED_MARKERS = {
         "ca2282eafca03573ac9c88277125cc6973234959",
         "User data",
         "Distribution notices",
+        "LICENSE-APACHE-2.0",
+        "THIRD_PARTY_NOTICES.md",
         "every `Required Notice:`",
         "explicit inbound-rights policy",
+    ),
+    "THIRD_PARTY_NOTICES.md": (
+        "worker-configuration.d.ts",
+        "workerd@1.20260907.1",
+        "Cloudflare",
+        "Microsoft",
+        "Apache License 2.0",
+        "LICENSE-APACHE-2.0",
     ),
     "README.md": (
         "PolyForm Perimeter 1.0.1 as the prospective Hosted implementation default",
@@ -82,18 +145,18 @@ LICENSING_REQUIRED_MARKERS = {
         "user-owned data is outside Runethread's software-license grants",
     ),
     "docs/CURRENT_MILESTONE.md": (
-        "Hosted has **no prospective MIT exception**",
+        "Hosted has no prospective MIT exception",
         "Core's exact MIT interoperability boundary does not automatically extend into Hosted",
-        "no runtime/provider/toolchain file is admitted",
+        "user-owned data remains outside Runethread's software-license grants",
     ),
     "docs/DEVELOPMENT_PIPELINE.md": (
         "ADR-026 is the accepted project licensing/commercial-model decision",
         "Hosted has **no prospective MIT exception**",
-        "user-authored memories/projects/imports/attachments/data remain outside Runethread's software-license grants",
+        "User-authored memories/projects/imports/attachments/data remain outside Runethread's software-license grants",
         "Self-protection limitation",
-        "green CI cannot attest to its own integrity",
+        "Green CI therefore cannot attest to its own integrity",
         "every `Required Notice:`",
-        "No Hosted release artifact may be published until that notice packaging is proven",
+        "No Hosted release artifact may be published until its applicable notice/rights packaging is proven",
     ),
     "docs/ENGINEERING_PROCESS.md": (
         "ADR-026 settles the Hosted licensing/commercial model",
@@ -124,7 +187,6 @@ CURRENT_MIT_CLAIM_RE = re.compile(
     r"|uses\s+(?:the\s+)?MIT\s+License\b)",
     re.IGNORECASE,
 )
-
 LICENSE_VOCAB_RE = re.compile(
     r"(?i)(?:"
     r"\b(?:license|licensed|licenses|licensing|licensor|licensee|licence|licenced|licences|licencing)\b|"
@@ -136,7 +198,6 @@ LICENSE_VOCAB_RE = re.compile(
     r"SPDX-License-Identifier"
     r")"
 )
-
 EXACT_SEMVER_RE = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
     r"(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
@@ -147,7 +208,15 @@ SECRET_NAMES = (".env", ".dev.vars")
 SECRET_SUFFIXES = {".pem", ".key", ".p12", ".pfx", ".ppk"}
 PRIVATE_KEY_NAMES = {"id_rsa", "id_dsa", "id_ecdsa", "id_ed25519"}
 TEXT_SUFFIXES = {".md", ".py", ".yml", ".yaml", ".json", ".jsonc", ".ts", ".js", ".txt"}
-TEXT_NAMES = {".gitattributes", ".gitignore", ".editorconfig", "LICENSE", "LICENSE-MIT"}
+TEXT_NAMES = {
+    ".gitattributes",
+    ".gitignore",
+    ".editorconfig",
+    ".nvmrc",
+    "LICENSE",
+    "LICENSE-MIT",
+    "LICENSE-APACHE-2.0",
+}
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -155,30 +224,45 @@ def sha256_bytes(data: bytes) -> str:
 
 
 def git_blob_sha1(data: bytes) -> str:
-    """Return the Git SHA-1 object id for exact blob bytes."""
     header = f"blob {len(data)}\0".encode("ascii")
     return hashlib.sha1(header + data).hexdigest()
 
 
+def exact_file_errors(root: Path, expected: dict[str, str], label: str) -> list[str]:
+    errors: list[str] = []
+    for relative, digest in expected.items():
+        path = root / relative
+        try:
+            actual = sha256_bytes(path.read_bytes())
+        except OSError as exc:
+            errors.append(f"cannot read {label} file {relative}: {exc}")
+            continue
+        if actual != digest:
+            errors.append(
+                f"{label} file {relative} must match exact reviewed bytes: expected sha256 {digest}, got {actual}"
+            )
+    return errors
+
+
 def workflow_errors(text: str) -> list[str]:
     digest = sha256_bytes(text.encode("utf-8"))
-    if digest != BOOTSTRAP_WORKFLOW_SHA256:
+    if digest != WORKFLOW_SHA256:
         return [
-            "bootstrap workflow must match the exact reviewed contract: "
-            f"expected sha256 {BOOTSTRAP_WORKFLOW_SHA256}, got {digest}"
+            "required workflow must match the exact reviewed contract: "
+            f"expected sha256 {WORKFLOW_SHA256}, got {digest}"
         ]
     return []
 
 
-def bootstrap_manifest_errors(tracked_relatives: set[str]) -> list[str]:
+def tracked_manifest_errors(tracked_relatives: set[str]) -> list[str]:
     errors: list[str] = []
-    expected = set(BOOTSTRAP_TRACKED_FILES)
+    expected = set(TRACKED_FILES)
     for relative in sorted(expected - tracked_relatives):
-        errors.append(f"required bootstrap tracked file missing: {relative}")
+        errors.append(f"required tracked file missing: {relative}")
     for relative in sorted(tracked_relatives - expected):
         errors.append(
-            f"unexpected tracked file during dependency-free pre-runtime gate: {relative}; "
-            "extend the reviewed manifest only after the licensing/toolchain gate permits it"
+            f"unexpected tracked file during the non-operational shell gate: {relative}; "
+            "extend the reviewed manifest deliberately under the owning milestone"
         )
     return errors
 
@@ -200,32 +284,133 @@ def package_manifest_errors(root: Path, tracked_relatives: set[str]) -> list[str
 def package_errors(package_path: Path, lock_path: Path) -> list[str]:
     errors: list[str] = []
     if package_path.exists() != lock_path.exists():
-        errors.append("package.json and package-lock.json must be introduced/removed together")
-        return errors
+        return ["package.json and package-lock.json must be introduced/removed together"]
     if not package_path.exists():
-        return errors
+        return []
     try:
-        package = json.loads(package_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        package_bytes = package_path.read_bytes()
+        package = json.loads(package_bytes.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         return [f"cannot parse package.json: {exc}"]
     try:
-        lock = json.loads(lock_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        lock_bytes = lock_path.read_bytes()
+        lock = json.loads(lock_bytes.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         return [f"cannot parse package-lock.json: {exc}"]
+
     if not isinstance(package, dict):
         return ["package.json root must be an object"]
     if not isinstance(lock, dict):
-        errors.append("package-lock.json root must be an object")
+        return ["package-lock.json root must be an object"]
+
+    if sha256_bytes(package_bytes) != TOOLCHAIN_SURFACE_SHA256["package.json"]:
+        errors.append("package.json must match the exact reviewed non-operational toolchain manifest")
+    if sha256_bytes(lock_bytes) != PACKAGE_LOCK_SHA256:
+        errors.append("package-lock.json must match the exact reviewed generated lockfile")
+
+    if package.get("name") != "@runethread/hosted":
+        errors.append("package name must remain @runethread/hosted")
     if package.get("private") is not True:
         errors.append("service package must set private: true")
-    for section in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies"):
-        values = package.get(section, {})
-        if not isinstance(values, dict):
-            errors.append(f"{section} must be an object")
+    if package.get("type") != "module":
+        errors.append("service package must remain an ES module package")
+    if package.get("packageManager") != f"npm@{NPM_VERSION}":
+        errors.append(f"packageManager must be exactly npm@{NPM_VERSION}")
+    if package.get("engines") != {"node": NODE_VERSION}:
+        errors.append(f"package engines.node must be exactly {NODE_VERSION}")
+    if package.get("scripts") != EXPECTED_SCRIPTS:
+        errors.append("package scripts must match the exact non-operational validation-only script set")
+    if package.get("devDependencies") != EXPECTED_DEV_DEPENDENCIES:
+        errors.append("direct devDependencies must match the exact reviewed toolchain versions")
+
+    for section in ("dependencies", "optionalDependencies", "peerDependencies"):
+        values = package.get(section)
+        if values not in (None, {}):
+            errors.append(f"{section} is not admitted by the non-operational shell gate")
+    for name, version in package.get("devDependencies", {}).items():
+        if not isinstance(version, str) or EXACT_SEMVER_RE.fullmatch(version) is None:
+            errors.append(f"devDependencies.{name} must use an exact SemVer version, got {version!r}")
+
+    if lock.get("lockfileVersion") != 3:
+        errors.append("package-lock.json must use lockfileVersion 3")
+    if lock.get("requires") is not True:
+        errors.append("package-lock.json must set requires: true")
+    packages = lock.get("packages")
+    if not isinstance(packages, dict):
+        errors.append("package-lock.json packages must be an object")
+        return errors
+    root = packages.get("")
+    if not isinstance(root, dict):
+        errors.append("package-lock.json must contain the root package entry")
+        return errors
+    if root.get("name") != "@runethread/hosted":
+        errors.append("lockfile root package name mismatch")
+    if root.get("devDependencies") != EXPECTED_DEV_DEPENDENCIES:
+        errors.append("lockfile root devDependencies do not match package.json")
+    if root.get("engines") != {"node": NODE_VERSION}:
+        errors.append("lockfile root Node engine mismatch")
+    if root.get("dependencies") not in (None, {}):
+        errors.append("lockfile root runtime dependencies are not admitted")
+
+    for relative, metadata in packages.items():
+        if relative == "":
             continue
-        for name, version in values.items():
-            if not isinstance(version, str) or EXACT_SEMVER_RE.fullmatch(version) is None:
-                errors.append(f"{section}.{name} must use an exact SemVer version, got {version!r}")
+        if not isinstance(metadata, dict):
+            errors.append(f"lockfile package entry must be an object: {relative}")
+            continue
+        if metadata.get("dev") is not True:
+            errors.append(f"all current lockfile packages must remain development-only: {relative}")
+        resolved = metadata.get("resolved")
+        if not isinstance(resolved, str) or not resolved.startswith("https://registry.npmjs.org/"):
+            errors.append(f"lockfile package must resolve from registry.npmjs.org: {relative}")
+        integrity = metadata.get("integrity")
+        if not isinstance(integrity, str) or not integrity.startswith("sha512-"):
+            errors.append(f"lockfile package must carry sha512 integrity metadata: {relative}")
+        if metadata.get("link") is True:
+            errors.append(f"lockfile link/workspace package is not admitted: {relative}")
+
+    return errors
+
+
+def wrangler_errors(path: Path) -> list[str]:
+    try:
+        config = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return [f"cannot parse wrangler.jsonc: {exc}"]
+    expected = {
+        "$schema": "./node_modules/wrangler/config-schema.json",
+        "name": "runethread-hosted",
+        "main": "src/index.ts",
+        "compatibility_date": "2026-09-09",
+        "compatibility_flags": ["no_nodejs_compat", "no_nodejs_compat_v2"],
+        "workers_dev": False,
+        "preview_urls": False,
+    }
+    if config != expected:
+        return [
+            "wrangler.jsonc must remain the exact resource-free non-operational shell configuration; "
+            "bindings/routes/resources/compatibility changes require the owning later gate"
+        ]
+    return []
+
+
+def generated_types_errors(path: Path) -> list[str]:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return [f"cannot read generated Worker types: {exc}"]
+    required = (
+        "Generated by Wrangler by running `wrangler types`",
+        'mainModule: typeof import("./src/index")',
+        "interface Env extends __BaseEnv_Env {}",
+        "Runtime types generated with workerd@",
+        "2026-09-09 no_nodejs_compat,no_nodejs_compat_v2",
+        "// Begin runtime types",
+        "cloudflare:workers",
+    )
+    errors = [f"generated Worker types missing required marker: {marker}" for marker in required if marker not in text]
+    if "--include-runtime=false" in text:
+        errors.append("generated Worker types must include compatibility-locked runtime declarations")
     return errors
 
 
@@ -278,8 +463,7 @@ def tracked_regular_files(root: Path) -> tuple[list[Path], list[str]]:
 def secret_path_errors(paths: Iterable[Path]) -> list[str]:
     errors: list[str] = []
     for path in paths:
-        name = path.name
-        lower_name = name.lower()
+        lower_name = path.name.lower()
         is_env_secret = any(lower_name == prefix or lower_name.startswith(prefix + ".") for prefix in SECRET_NAMES)
         if is_env_secret and not lower_name.endswith(".example"):
             errors.append(f"tracked secret file is forbidden: {path}")
@@ -322,7 +506,9 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
     exact_hashes = {
         "LICENSE": PERIMETER_LICENSE_SHA256,
         "LICENSE-MIT": HISTORICAL_MIT_LICENSE_SHA256,
+        "LICENSE-APACHE-2.0": APACHE_2_LICENSE_SHA256,
         "LICENSING.md": LICENSING_POLICY_SHA256,
+        "THIRD_PARTY_NOTICES.md": THIRD_PARTY_NOTICES_SHA256,
     }
     for relative, expected in exact_hashes.items():
         if relative not in tracked_relatives:
@@ -336,8 +522,7 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
             continue
         if actual != expected:
             errors.append(
-                f"{relative} must match exact reviewed licensing bytes: "
-                f"expected sha256 {expected}, got {actual}"
+                f"{relative} must match exact reviewed licensing bytes: expected sha256 {expected}, got {actual}"
             )
 
     for relative, expected_blob in LICENSING_AUTHORITY_GIT_BLOBS.items():
@@ -353,8 +538,7 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
         actual_blob = git_blob_sha1(data)
         if actual_blob != expected_blob:
             errors.append(
-                f"{relative} must match exact reviewed governance bytes during the pre-runtime gate: "
-                f"expected git blob {expected_blob}, got {actual_blob}"
+                f"{relative} must match exact reviewed governance bytes: expected git blob {expected_blob}, got {actual_blob}"
             )
 
     for relative, markers in LICENSING_REQUIRED_MARKERS.items():
@@ -369,9 +553,11 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
             if marker not in text:
                 errors.append(f"{relative} missing licensing invariant marker: {marker}")
 
-    # Every tracked file in the current pre-runtime manifest is intentionally
-    # project-controlled text. Scan all of them fail-closed rather than trusting
-    # filename suffixes; future binary admission requires an explicit policy change.
+    # All current tracked files are intentional text. Dependency metadata plus
+    # exact-hash-locked third-party distribution surfaces may contain third-party
+    # license/rights notices. Those bytes are not Hosted licensing authority and
+    # are exempt from prose claim/vocabulary classification only; their exact,
+    # toolchain, and third-party-license checks remain mandatory.
     for relative in sorted(tracked_relatives):
         path = root / relative
         text, read_error = _read_utf8(path)
@@ -379,20 +565,23 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
             errors.append(f"cannot scan licensing claims in {relative}: {read_error}")
             continue
 
-        if relative != "LICENSE-MIT" and CURRENT_MIT_CLAIM_RE.search(text):
+        if (
+            relative not in NON_AUTHORITY_LICENSE_TEXT_PATHS
+            and relative != "LICENSE-MIT"
+            and CURRENT_MIT_CLAIM_RE.search(text)
+        ):
             errors.append(
-                f"{relative} makes a stale/current MIT claim for Hosted; "
-                "historical MIT belongs only to the historical-grant context"
+                f"{relative} makes a stale/current MIT claim for Hosted; historical MIT belongs only to the historical-grant context"
             )
 
         if (
             relative not in LICENSING_AUTHORITY_PATHS
             and relative not in LICENSING_GUARD_IMPLEMENTATION_PATHS
+            and relative not in NON_AUTHORITY_LICENSE_TEXT_PATHS
             and LICENSE_VOCAB_RE.search(text)
         ):
             errors.append(
-                f"{relative} contains licensing/rights vocabulary outside the exact reviewed "
-                "Hosted licensing authority surfaces"
+                f"{relative} contains licensing/rights vocabulary outside the exact reviewed Hosted licensing authority surfaces"
             )
 
     return errors
@@ -400,36 +589,42 @@ def licensing_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
 
 def check_repository(root: Path) -> list[str]:
     errors: list[str] = []
-    project_paths, manifest_errors = tracked_regular_files(root)
-    errors.extend(manifest_errors)
+    project_paths, manifest_parse_errors = tracked_regular_files(root)
+    errors.extend(manifest_parse_errors)
     tracked_relatives = {path.relative_to(root).as_posix() for path in project_paths}
 
-    errors.extend(bootstrap_manifest_errors(tracked_relatives))
+    errors.extend(tracked_manifest_errors(tracked_relatives))
 
     workflows = tuple(
         sorted(
             relative
             for relative in tracked_relatives
-            if relative.startswith(".github/workflows/")
-            and Path(relative).suffix.lower() in {".yml", ".yaml"}
+            if relative.startswith(".github/workflows/") and Path(relative).suffix.lower() in {".yml", ".yaml"}
         )
     )
-    if workflows != BOOTSTRAP_WORKFLOWS:
-        errors.append(
-            "bootstrap workflow manifest must be exactly "
-            f"{BOOTSTRAP_WORKFLOWS!r}, got {workflows!r}; extend policy deliberately before adding workflows"
-        )
-
+    if workflows != WORKFLOWS:
+        errors.append(f"workflow manifest must be exactly {WORKFLOWS!r}, got {workflows!r}")
     for relative in workflows:
-        workflow = root / relative
         try:
-            text = workflow.read_text(encoding="utf-8")
+            text = (root / relative).read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as exc:
             errors.append(f"cannot read {relative}: {exc}")
             continue
         errors.extend(f"{relative}: {err}" for err in workflow_errors(text))
 
+    dependabot = root / ".github" / "dependabot.yml"
+    try:
+        actual_dependabot = sha256_bytes(dependabot.read_bytes())
+    except OSError as exc:
+        errors.append(f"cannot read .github/dependabot.yml: {exc}")
+    else:
+        if actual_dependabot != DEPENDABOT_SHA256:
+            errors.append(".github/dependabot.yml must match the reviewed Actions+npm maintenance policy")
+
     errors.extend(package_manifest_errors(root, tracked_relatives))
+    errors.extend(exact_file_errors(root, TOOLCHAIN_SURFACE_SHA256, "toolchain/shell"))
+    errors.extend(wrangler_errors(root / "wrangler.jsonc"))
+    errors.extend(generated_types_errors(root / "worker-configuration.d.ts"))
     errors.extend(secret_path_errors(project_paths))
     errors.extend(crlf_errors(project_paths))
     errors.extend(licensing_errors(root, tracked_relatives))
