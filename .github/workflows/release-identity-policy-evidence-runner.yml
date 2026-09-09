@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   evidence:
-    if: "${{ github.event.head_commit.message == 'chore: rerun ADR-028 release policy evidence' }}"
+    if: "${{ github.event.head_commit.message == 'chore: execute ADR-028 ratification evidence' }}"
     runs-on: ubuntu-latest
     steps:
       - name: Check out branch
@@ -34,8 +34,8 @@ jobs:
           prefix = ' ' * 10
           code = '\n'.join(line[len(prefix):] if line.startswith(prefix) else line for line in lines[start:end])
           code = code.replace(
-              'subprocess.check_call(["git", "rm", "--cached", TEMP_WORKFLOW])',
-              'subprocess.check_call(["git", "rm", "--cached", "--ignore-unmatch", TEMP_WORKFLOW])',
+              'subprocess.run(["git", "rm", "--cached", TEMP_WORKFLOW], check=True)',
+              'subprocess.run(["git", "rm", "--cached", "--ignore-unmatch", TEMP_WORKFLOW], check=True)',
           )
 
           subprocess.check_call([
@@ -45,4 +45,31 @@ jobs:
           ])
           compile(code, '<embedded-release-policy-evidence>', 'exec')
           exec(code, {'__name__': '__main__'})
+          PY
+
+          python3 -m py_compile scripts/check_development_policy.py scripts/check_development_policy_test.py
+          python3 scripts/check_development_policy_test.py
+          python3 scripts/check_development_policy.py
+          git diff --check
+          git diff --cached --check
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import subprocess
+
+          for relative in (
+              "scripts/check_development_policy.py",
+              "scripts/check_development_policy_test.py",
+              "release/identity-policy.json",
+              "scripts/release_identity.mjs",
+              "AGENTS.md",
+              "docs/CURRENT_MILESTONE.md",
+              "docs/DEVELOPMENT_PIPELINE.md",
+              ".github/pull_request_template.md",
+          ):
+              data = Path(relative).read_bytes()
+              print(f"{relative}_sha256={hashlib.sha256(data).hexdigest()}")
+              print(f"{relative}_git_blob={subprocess.check_output(['git', 'hash-object', relative], text=True).strip()}")
+          print(f"final_tree={subprocess.check_output(['git', 'write-tree'], text=True).strip()}")
           PY
