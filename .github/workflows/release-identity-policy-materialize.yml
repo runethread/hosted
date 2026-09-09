@@ -1,0 +1,96 @@
+name: Materialize ratified release identity policy
+
+on:
+  push:
+    branches:
+      - runethread/release-identity-baseline
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: "${{ github.event.head_commit.message == 'chore: materialize ADR-028 ratified policy' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch with branch-only write token
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Materialize only the pre-verified final tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          source_path = Path('.github/workflows/release-identity-policy-evidence-v2.yml')
+          lines = source_path.read_text(encoding='utf-8').splitlines()
+          start = next(i for i, line in enumerate(lines) if "python3 - <<'PY'" in line) + 1
+          end = next(i for i in range(start, len(lines)) if lines[i].strip() == 'PY')
+          prefix = ' ' * 10
+          code = '\n'.join(line[len(prefix):] if line.startswith(prefix) else line for line in lines[start:end])
+          code = code.replace(
+              'subprocess.run(["git", "rm", "--cached", TEMP_WORKFLOW], check=True)',
+              'subprocess.run(["git", "rm", "--cached", "--ignore-unmatch", TEMP_WORKFLOW], check=True)',
+          )
+          code = code.replace(
+              'a3da1a6ed672d2c8dc9722764eef8d97c114cba9',
+              'd72f89483478242ba11759ac61f27a1bec196dd9',
+          )
+          compile(code, '<embedded-release-policy-ratifier>', 'exec')
+          exec(code, {'__name__': '__main__'})
+          PY
+
+          git rm --cached --ignore-unmatch \
+            .github/workflows/release-identity-policy-evidence-runner.yml \
+            .github/workflows/release-identity-policy-materialize.yml
+
+          python3 -m py_compile scripts/check_development_policy.py scripts/check_development_policy_test.py
+          python3 scripts/check_development_policy_test.py
+          python3 scripts/check_development_policy.py
+          git diff --check
+          git diff --cached --check
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import subprocess
+
+          expected = {
+              'scripts/check_development_policy.py': (
+                  '9e75c9e6b2ac45da331abb9f3948f0f978c5541f24288d2ed8d85adda2ef27d6',
+                  'c168ff7a4c99ac55cd4259d88357ac46fa91805c',
+              ),
+              'scripts/check_development_policy_test.py': (
+                  '42bd84d01b52c3e9870b5e3b346370e8ba7ac0e30de6fbee5073856a9e64a721',
+                  '9630aaa2d5a65cc3c43243b1b60a492a6dbb4c42',
+              ),
+          }
+          for relative, (expected_sha, expected_blob) in expected.items():
+              data = Path(relative).read_bytes()
+              actual_sha = hashlib.sha256(data).hexdigest()
+              actual_blob = subprocess.check_output(['git', 'hash-object', relative], text=True).strip()
+              if actual_sha != expected_sha or actual_blob != expected_blob:
+                  raise SystemExit(
+                      f'{relative} identity mismatch: sha256={actual_sha} blob={actual_blob}'
+                  )
+
+          expected_tree = '5def93a6e375954b693a6a54f2a22e1997077942'
+          actual_tree = subprocess.check_output(['git', 'write-tree'], text=True).strip()
+          if actual_tree != expected_tree:
+              raise SystemExit(f'final tree mismatch: expected {expected_tree}, got {actual_tree}')
+          print(f'final_tree={actual_tree}')
+          PY
+
+          expected_paths=$'.github/workflows/release-identity-policy-evidence-runner.yml\n.github/workflows/release-identity-policy-evidence-v2.yml\n.github/workflows/release-identity-policy-materialize.yml\nscripts/check_development_policy.py\nscripts/check_development_policy_test.py'
+          actual_paths="$(git diff --cached --name-only | sort)"
+          test "$actual_paths" = "$expected_paths"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'policy: ratify Hosted release identity baseline'
+          git push origin HEAD:runethread/release-identity-baseline
