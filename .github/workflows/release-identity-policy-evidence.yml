@@ -1,0 +1,419 @@
+name: Release identity policy evidence
+
+on:
+  push:
+    branches:
+      - runethread/release-identity-baseline
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    if: "${{ github.event.head_commit.message == 'chore: stage release policy evidence' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Simulate exact release-policy ratification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import subprocess
+
+          ROOT = Path.cwd()
+          GUARD = ROOT / "scripts/check_development_policy.py"
+          TESTS = ROOT / "scripts/check_development_policy_test.py"
+          TEMP_WORKFLOW = ".github/workflows/release-identity-policy-evidence.yml"
+
+          def replace_once(text: str, old: str, new: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected one replacement target, got {count}: {old[:100]!r}")
+              return text.replace(old, new, 1)
+
+          guard = GUARD.read_text(encoding="utf-8")
+
+          guard = replace_once(
+              guard,
+              '    "package-lock.json",\n    "scripts/check_development_policy.py",\n    "scripts/check_development_policy_test.py",',
+              '    "package-lock.json",\n    "release/identity-policy.json",\n    "scripts/check_development_policy.py",\n    "scripts/check_development_policy_test.py",\n    "scripts/release_identity.mjs",',
+          )
+
+          guard = replace_once(
+              guard,
+              '''EXPECTED_SCRIPTS = {
+              "types:check": "wrangler types --check",
+              "typecheck": "tsc --noEmit && tsc -p test/tsconfig.json --noEmit",
+              "test": "vitest run",
+              "check": "npm run types:check && npm run typecheck && npm test",
+          }''',
+              '''EXPECTED_SCRIPTS = {
+              "types:check": "wrangler types --check",
+              "typecheck": "tsc --noEmit && tsc -p test/tsconfig.json --noEmit",
+              "test": "vitest run",
+              "release:verify-ci": "node scripts/release_identity.mjs --mode ci --version v0.0.0-ci",
+              "check": "npm run types:check && npm run typecheck && npm test && npm run release:verify-ci",
+          }''',
+          )
+
+          guard = replace_once(
+              guard,
+              '    "package.json": "c805df3ba473aad27ba59ec29567a3d63ff44f988baf8d8b4eff5379f25685ca",',
+              '    "package.json": "7167e5c7f333d716ea43e8b492a110283312d57416893bc7d090c77c4cfe9aa3",',
+          )
+          guard = replace_once(
+              guard,
+              '    "wrangler.jsonc": "156271834722bc94f4382c91bf7450d24e9ff5766cc11560babb23628f55ce45",',
+              '    "wrangler.jsonc": "5edbb90b6d53027f4e24ed2589c43b3eee7638f6d1bc016179bbdd8a879eb039",',
+          )
+
+          for old, new in {
+              '    "AGENTS.md": "c4ca7f3d5a040343c61c92d19528d33c9beead80",': '    "AGENTS.md": "fa451c4950af4e76a811dec53d06ad12ace12664",',
+              '    "docs/CURRENT_MILESTONE.md": "03589f1c7641e1bd9aaab3334ef8e41bb3de0658",': '    "docs/CURRENT_MILESTONE.md": "e94326cf56d2623aaa80b8dd7b3c75666682006e",',
+              '    "docs/DEVELOPMENT_PIPELINE.md": "42574faeef46e42a951ba9a83eab7b4a9dcd7a67",': '    "docs/DEVELOPMENT_PIPELINE.md": "2c9d6ce6e795dd9e5c0a43023a9e9c6042eeab26",',
+              '    ".github/pull_request_template.md": "553376106373fb5e988e8bd04eb59b320b215d48",': '    ".github/pull_request_template.md": "d9642890d56951de4d4fb0fddd991546ed28eb4a",',
+          }.items():
+              guard = replace_once(guard, old, new)
+
+          guard = replace_once(
+              guard,
+              'NON_AUTHORITY_LICENSE_METADATA_PATHS = frozenset({"package-lock.json"})',
+              'NON_AUTHORITY_LICENSE_METADATA_PATHS = frozenset({"package-lock.json", "release/identity-policy.json"})',
+          )
+
+          guard = replace_once(
+              guard,
+              '''    expected = {
+                  "$schema": "./node_modules/wrangler/config-schema.json",
+                  "name": "runethread-hosted",
+                  "main": "src/index.ts",
+                  "compatibility_date": "2026-09-09",
+                  "compatibility_flags": ["no_nodejs_compat", "no_nodejs_compat_v2"],
+                  "workers_dev": False,
+                  "preview_urls": False,
+              }''',
+              '''    expected = {
+                  "$schema": "./node_modules/wrangler/config-schema.json",
+                  "name": "runethread-hosted",
+                  "main": "src/index.ts",
+                  "compatibility_date": "2026-09-09",
+                  "compatibility_flags": ["no_nodejs_compat", "no_nodejs_compat_v2"],
+                  "workers_dev": False,
+                  "preview_urls": False,
+                  "minify": False,
+                  "upload_source_maps": False,
+                  "find_additional_modules": False,
+                  "send_metrics": False,
+                  "dependencies_instrumentation": {"enabled": False},
+              }''',
+          )
+
+          constants_anchor = 'PACKAGE_LOCK_SHA256 = "dafea88d811a42ccb96a6b1f4cee69212732adb4f8e7b28ab4efb7997db13eb2"\n\nNODE_VERSION'
+          constants_insert = '''PACKAGE_LOCK_SHA256 = "dafea88d811a42ccb96a6b1f4cee69212732adb4f8e7b28ab4efb7997db13eb2"
+          RELEASE_IDENTITY_GIT_BLOBS = {
+              "release/identity-policy.json": "1f864dd21378486a27db52374ecd7233cf2680a7",
+              "scripts/release_identity.mjs": "0b0eb1937179700e2ba506bc31b3d8f604536366",
+          }
+          RELEASE_CORE_IDENTITY = {
+              "runtime_release": "v0.9.0",
+              "runtime_git_commit": "7f5cf86f23604426c7e8f69086fdcbe27fb86226",
+              "contract_release": "v0.9.0",
+              "contract_version": 9,
+              "repository_format": 2,
+              "memory_schema": 1,
+              "index_format": 2,
+              "trust_lock_version": 2,
+              "bootstrap_protocol": 1,
+              "bootstrap_verifier": "v0.6.0",
+          }
+          RELEASE_WORKER_IDENTITY = {
+              "wrangler": "4.129.1",
+              "compatibility_date": "2026-09-09",
+              "compatibility_flags": ["no_nodejs_compat", "no_nodejs_compat_v2"],
+              "generated_runtime_types_workerd": "1.20260907.1",
+              "generated_types_sha256": "d67a9e9d72dd0d155fcfd187a64d83ab062db80f20b585dfa36904ee0c778b44",
+              "wrangler_config_sha256": "5edbb90b6d53027f4e24ed2589c43b3eee7638f6d1bc016179bbdd8a879eb039",
+          }
+          RELEASE_BUILD_IDENTITY = {
+              "node": "24.20.0",
+              "npm": "11.19.0",
+              "package_lock_sha256": PACKAGE_LOCK_SHA256,
+              "node_env": "production",
+              "wrangler_args": [
+                  "deploy",
+                  "--dry-run",
+                  "--config",
+                  "wrangler.jsonc",
+                  "--x-provision=false",
+                  "--x-auto-create=false",
+              ],
+              "deploy_artifact_paths": ["index.js"],
+              "dry_run_auxiliary_paths": ["README.md"],
+              "expected_deploy_artifacts": {
+                  "index.js": "905ab7b489f99893812b422862dc8dd527790fe9cdd1a9f730e2514d552bf0cf"
+              },
+          }
+          RELEASE_PROTOCOL_IDENTITIES = {
+              "hosted_api": "not_implemented",
+              "repository_runtime": "not_implemented",
+              "candidate_envelope": "not_implemented",
+              "finalization_evidence": "not_implemented",
+              "audit_conformance": "not_implemented",
+              "terminal_success_verification": "not_implemented",
+              "terminal_disposition": "not_implemented",
+              "safety_journal": "not_implemented",
+              "publication": "not_implemented",
+              "reconciliation": "not_implemented",
+          }
+          RELEASE_CAPABILITIES = {
+              "authenticated_api": False,
+              "repository_binding": False,
+              "durable_state": False,
+              "semantic_mutation": False,
+              "publication": False,
+              "deployment": False,
+          }
+          RELEASE_DISTRIBUTION_IDENTITIES = {
+              "LICENSE": PERIMETER_LICENSE_SHA256,
+              "LICENSE-MIT": HISTORICAL_MIT_LICENSE_SHA256,
+              "LICENSE-APACHE-2.0": APACHE_2_LICENSE_SHA256,
+              "LICENSING.md": LICENSING_POLICY_SHA256,
+              "THIRD_PARTY_NOTICES.md": THIRD_PARTY_NOTICES_SHA256,
+          }
+
+          NODE_VERSION'''
+          guard = replace_once(guard, constants_anchor, constants_insert)
+
+          function_anchor = '''    return errors
+
+
+def workflow_errors(text: str) -> list[str]:'''
+          function_insert = '''    return errors
+
+
+def release_identity_errors(root: Path, tracked_relatives: set[str]) -> list[str]:
+              errors: list[str] = []
+              for relative, expected_blob in RELEASE_IDENTITY_GIT_BLOBS.items():
+                  if relative not in tracked_relatives:
+                      errors.append(f"required release identity surface missing: {relative}")
+                      continue
+                  try:
+                      data = (root / relative).read_bytes()
+                  except OSError as exc:
+                      errors.append(f"cannot read release identity surface {relative}: {exc}")
+                      continue
+                  actual_blob = git_blob_sha1(data)
+                  if actual_blob != expected_blob:
+                      errors.append(
+                          f"{relative} must match exact reviewed release identity bytes: "
+                          f"expected git blob {expected_blob}, got {actual_blob}"
+                      )
+
+              policy_path = root / "release/identity-policy.json"
+              try:
+                  policy = json.loads(policy_path.read_text(encoding="utf-8"))
+              except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                  errors.append(f"cannot parse release identity policy: {exc}")
+                  return errors
+              if not isinstance(policy, dict):
+                  errors.append("release identity policy root must be an object")
+                  return errors
+
+              expected_root = {
+                  "schema",
+                  "component",
+                  "publication_enabled",
+                  "release_version",
+                  "source",
+                  "core",
+                  "worker",
+                  "build",
+                  "protocols",
+                  "capabilities",
+                  "distribution",
+              }
+              if set(policy) != expected_root:
+                  errors.append("release identity policy root keys must match the reviewed baseline")
+              if policy.get("schema") != 1 or policy.get("component") != "runethread/hosted":
+                  errors.append("release identity policy schema/component mismatch")
+              if policy.get("publication_enabled") is not False:
+                  errors.append("release identity baseline must remain non-publishing")
+
+              version = policy.get("release_version")
+              if not isinstance(version, dict) or set(version) != {"format", "ci_reserved"}:
+                  errors.append("release version policy must contain only format and ci_reserved")
+              else:
+                  pattern_text = version.get("format")
+                  try:
+                      pattern = re.compile(pattern_text) if isinstance(pattern_text, str) else None
+                  except re.error as exc:
+                      errors.append(f"release version regex is invalid: {exc}")
+                      pattern = None
+                  if version.get("ci_reserved") != "v0.0.0-ci":
+                      errors.append("release version CI reservation must remain v0.0.0-ci")
+                  if pattern is not None:
+                      for valid in ("v0.0.0", "v1.2.3", "v1.2.3-rc.1", "v1.2.3+build.7"):
+                          if pattern.fullmatch(valid) is None:
+                              errors.append(f"release version policy rejects valid SemVer {valid}")
+                      for invalid in ("1.2.3", "v01.2.3", "v1.2.3-01", "v1.2"):
+                          if pattern.fullmatch(invalid) is not None:
+                              errors.append(f"release version policy admits invalid/non-prefixed SemVer {invalid}")
+
+              if policy.get("source") != {
+                  "repository": "runethread/hosted",
+                  "release_branch": "main",
+                  "require_clean_tracked_tree": True,
+                  "require_protected_validate": True,
+              }:
+                  errors.append("release source eligibility policy must match the reviewed protected-main baseline")
+              if policy.get("core") != RELEASE_CORE_IDENTITY:
+                  errors.append("release Core/runtime/contract identity must match the immutable reviewed baseline")
+              if policy.get("worker") != RELEASE_WORKER_IDENTITY:
+                  errors.append("release Worker/provider identity must match the reviewed baseline")
+              if policy.get("build") != RELEASE_BUILD_IDENTITY:
+                  errors.append("release build/artifact identity must match the reviewed dry-run baseline")
+              if policy.get("protocols") != RELEASE_PROTOCOL_IDENTITIES:
+                  errors.append("unimplemented Hosted protocols must remain explicit not_implemented identities")
+              if policy.get("capabilities") != RELEASE_CAPABILITIES:
+                  errors.append("unimplemented Hosted capabilities must remain false")
+              if policy.get("distribution") != {"required_files_sha256": RELEASE_DISTRIBUTION_IDENTITIES}:
+                  errors.append("release distribution notice identities must match current licensing policy")
+              return errors
+
+
+def workflow_errors(text: str) -> list[str]:'''
+          guard = replace_once(guard, function_anchor, function_insert)
+
+          guard = replace_once(
+              guard,
+              '    errors.extend(exact_file_errors(root, TOOLCHAIN_SURFACE_SHA256, "toolchain/shell"))\n    errors.extend(wrangler_errors(root / "wrangler.jsonc"))',
+              '    errors.extend(exact_file_errors(root, TOOLCHAIN_SURFACE_SHA256, "toolchain/shell"))\n    errors.extend(release_identity_errors(root, tracked_relatives))\n    errors.extend(wrangler_errors(root / "wrangler.jsonc"))',
+          )
+          GUARD.write_text(guard, encoding="utf-8")
+
+          tests = TESTS.read_text(encoding="utf-8")
+          tests = replace_once(tests, 'import json\nimport shutil', 'import json\nimport re\nimport shutil')
+          tests = replace_once(
+              tests,
+              '    LICENSE_VOCAB_RE,\n    NPM_VERSION,',
+              '    LICENSE_VOCAB_RE,\n    RELEASE_IDENTITY_GIT_BLOBS,\n    NPM_VERSION,',
+          )
+          tests = replace_once(
+              tests,
+              '    parse_tracked_manifest,\n    secret_path_errors,',
+              '    parse_tracked_manifest,\n    release_identity_errors,\n    secret_path_errors,',
+          )
+          tests = replace_once(
+              tests,
+              '''            "package-lock.json",
+              "worker-configuration.d.ts",
+              "LICENSE-APACHE-2.0",''',
+              '''            "package-lock.json",
+              "release/identity-policy.json",
+              "scripts/release_identity.mjs",
+              "worker-configuration.d.ts",
+              "LICENSE-APACHE-2.0",''',
+          )
+
+          release_tests_anchor = '\n\nclass TrackedManifestParsingTests(unittest.TestCase):'
+          release_tests = '''
+
+          class ReleaseIdentityPolicyTests(unittest.TestCase):
+              def _copy_surface(self, root: Path) -> set[str]:
+                  tracked = {"release/identity-policy.json", "scripts/release_identity.mjs"}
+                  for relative in tracked:
+                      target = root / relative
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      shutil.copyfile(PROJECT_ROOT / relative, target)
+                  return tracked
+
+              def test_exact_release_identity_surface_is_allowed(self) -> None:
+                  self.assertEqual(release_identity_errors(PROJECT_ROOT, set(TRACKED_FILES)), [])
+                  for relative, blob in RELEASE_IDENTITY_GIT_BLOBS.items():
+                      with self.subTest(relative=relative):
+                          self.assertEqual(git_blob_sha1((PROJECT_ROOT / relative).read_bytes()), blob)
+
+              def test_release_version_grammar_is_strict_semver_with_v_prefix(self) -> None:
+                  policy = json.loads((PROJECT_ROOT / "release/identity-policy.json").read_text(encoding="utf-8"))
+                  pattern = re.compile(policy["release_version"]["format"])
+                  for value in ("v0.0.0", "v1.2.3", "v1.2.3-rc.1", "v1.2.3+build.7"):
+                      self.assertIsNotNone(pattern.fullmatch(value), value)
+                  for value in ("1.2.3", "v01.2.3", "v1.2.3-01", "v1.2"):
+                      self.assertIsNone(pattern.fullmatch(value), value)
+
+              def test_publication_enable_is_rejected(self) -> None:
+                  with tempfile.TemporaryDirectory() as tmp:
+                      root = Path(tmp)
+                      tracked = self._copy_surface(root)
+                      path = root / "release/identity-policy.json"
+                      policy = json.loads(path.read_text(encoding="utf-8"))
+                      policy["publication_enabled"] = True
+                      path.write_text(json.dumps(policy, indent=2) + "\n", encoding="utf-8")
+                      self.assertTrue(any("non-publishing" in e for e in release_identity_errors(root, tracked)))
+
+              def test_floating_core_identity_is_rejected(self) -> None:
+                  with tempfile.TemporaryDirectory() as tmp:
+                      root = Path(tmp)
+                      tracked = self._copy_surface(root)
+                      path = root / "release/identity-policy.json"
+                      policy = json.loads(path.read_text(encoding="utf-8"))
+                      policy["core"]["runtime_git_commit"] = "main"
+                      path.write_text(json.dumps(policy, indent=2) + "\n", encoding="utf-8")
+                      self.assertTrue(any("Core/runtime/contract" in e for e in release_identity_errors(root, tracked)))
+
+              def test_future_protocol_identity_is_rejected_until_implemented(self) -> None:
+                  with tempfile.TemporaryDirectory() as tmp:
+                      root = Path(tmp)
+                      tracked = self._copy_surface(root)
+                      path = root / "release/identity-policy.json"
+                      policy = json.loads(path.read_text(encoding="utf-8"))
+                      policy["protocols"]["hosted_api"] = "v1"
+                      path.write_text(json.dumps(policy, indent=2) + "\n", encoding="utf-8")
+                      self.assertTrue(any("not_implemented" in e for e in release_identity_errors(root, tracked)))
+
+              def test_deploy_artifact_digest_drift_is_rejected(self) -> None:
+                  with tempfile.TemporaryDirectory() as tmp:
+                      root = Path(tmp)
+                      tracked = self._copy_surface(root)
+                      path = root / "release/identity-policy.json"
+                      policy = json.loads(path.read_text(encoding="utf-8"))
+                      policy["build"]["expected_deploy_artifacts"]["index.js"] = "0" * 64
+                      path.write_text(json.dumps(policy, indent=2) + "\n", encoding="utf-8")
+                      self.assertTrue(any("build/artifact" in e for e in release_identity_errors(root, tracked)))
+          '''
+          tests = replace_once(tests, release_tests_anchor, release_tests + release_tests_anchor)
+
+          tests = replace_once(
+              tests,
+              '''            ".github/pull_request_template.md",
+              "package-lock.json",
+          }''',
+              '''            ".github/pull_request_template.md",
+              "package-lock.json",
+              "release/identity-policy.json",
+          }''',
+          )
+          TESTS.write_text(tests, encoding="utf-8")
+
+          subprocess.run(["git", "rm", "--cached", "--quiet", TEMP_WORKFLOW], check=True)
+          (ROOT / TEMP_WORKFLOW).unlink()
+          subprocess.run(["python3", "-m", "py_compile", str(GUARD), str(TESTS)], check=True)
+          subprocess.run(["python3", str(TESTS)], check=True)
+          subprocess.run(["python3", str(GUARD)], check=True)
+          subprocess.run(["git", "diff", "--check"], check=True)
+          subprocess.run(["git", "add", "scripts/check_development_policy.py", "scripts/check_development_policy_test.py"], check=True)
+
+          for relative in ("scripts/check_development_policy.py", "scripts/check_development_policy_test.py"):
+              data = (ROOT / relative).read_bytes()
+              print(f"{relative}_sha256={hashlib.sha256(data).hexdigest()}")
+              print(f"{relative}_git_blob={subprocess.check_output(['git', 'hash-object', relative], text=True).strip()}")
+          print(f"final_tree={subprocess.check_output(['git', 'write-tree'], text=True).strip()}")
+          PY
