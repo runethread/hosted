@@ -54,7 +54,9 @@
     "dry_run_auxiliary_paths": [
       "README.md"
     ],
-    "expected_deploy_artifacts": {}
+    "expected_deploy_artifacts": {
+      "index.js": "905ab7b489f99893812b422862dc8dd527790fe9cdd1a9f730e2514d552bf0cf"
+    }
   },
   "protocols": {
     "hosted_api": "not_implemented",
