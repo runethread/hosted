@@ -17,7 +17,7 @@ Check every class that applies.
 - [ ] Finalizer / auditor / terminal verifier
 - [ ] GitHub App / publisher / webhook / ref publication
 - [ ] Security / privacy / secrets / logging / retention
-- [ ] Release / deployment / provider configuration
+- [ ] Release identity / compatibility / publication / deployment
 - [ ] Core architecture / runtime identity dependency
 
 ## Verified baseline
@@ -53,6 +53,7 @@ Check every class that applies.
 | Development pipeline / required checks | |
 | Dependency classification / lockfile | |
 | Licensing / commercial model | |
+| Release identity / executable artifact digest | |
 | Hosted request/status/cancel protocol | |
 | Authentication / caller authorization | |
 | Repository/App/canonical-ref/private binding | |
@@ -93,13 +94,23 @@ For material pipeline/repository-policy/dependency/toolchain/CI-self-protection 
 - [ ] Dependency advisory/license/platform implications were reviewed.
 - [ ] Generated Worker Env plus compatibility-locked runtime types are committed and `wrangler types --check` passes.
 
+## Release identity / compatibility gate
+
+- [ ] `release/identity-policy.json` was checked when this change can affect runtime/build/protocol compatibility.
+- [ ] No floating Core/provider/runtime identity was introduced; exact Core release/commit and actual implemented protocol identities are represented.
+- [ ] Components that do not exist yet remain explicitly `not_implemented`/false rather than receiving invented version numbers.
+- [ ] `publication_enabled` remains false unless this PR is an explicitly authorized release-publication milestone.
+- [ ] The release verifier uses credential-stripped dry-run only, provider provisioning/auto-create are disabled, and no deploy/publish command is added implicitly.
+- [ ] The exact dry-run output path set is reviewed; executable payload digest changes are deliberate and cross-platform reproducibility is proven.
+- [ ] A generated manifest is not treated as proof of live branch/ruleset/status-check eligibility; any publication path separately proves current protected `main` + exact-commit `validate`.
+
 ## Mandatory pipeline on exact head
 
 - [ ] `git diff --check`
 - [ ] policy guard compiles
 - [ ] policy guard self-tests pass
 - [ ] policy guard passes
-- [ ] Linux/macOS/Windows clean install + generated-type check + TypeScript + Workers-runtime tests pass
+- [ ] Linux/macOS/Windows clean install + generated-type check + TypeScript + Workers-runtime tests + release identity verification pass
 - [ ] aggregate `validate` passes on exact head
 
 Evidence / exact SHA:
@@ -115,6 +126,6 @@ Evidence / exact SHA:
 
 ## Release / deployment plan
 
-<!-- Explicitly state none, or the exact separate release/deployment gate. -->
+<!-- Explicitly state none, or the exact separate release/publication/deployment gate. -->
 
 ## Remaining concerns / uncertainty
