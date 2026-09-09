@@ -73,6 +73,8 @@ For dependency changes:
 - do not infer that a dependency's license changes Runethread's source license merely because the dependency is used as a development tool;
 - do not distribute or vendor third-party material without satisfying the obligations attached to that actual distribution surface.
 
+Any distributed Hosted release/artifact must deliver the applicable Perimeter terms or URL, every `Required Notice:`, and all notices required by actually bundled or distributed Core or third-party material.
+
 `package-lock.json` is dependency metadata, not Hosted licensing authority. `node_modules` is not a repository/distribution surface and remains ignored.
 
 ## 5. Hosted release-identity baseline
