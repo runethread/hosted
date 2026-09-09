@@ -54,6 +54,33 @@ function parseArgs(argv) {
   return parsed;
 }
 
+function verifySemverImplementation() {
+  const valid = [
+    "0.0.0",
+    "1.2.3",
+    "1.2.3-rc.1",
+    "1.2.3+build.7",
+    "1.2.3-alpha+001",
+    "1.0.0-x.7.z.92",
+  ];
+  const invalid = [
+    "01.0.0",
+    "1.01.0",
+    "1.0.01",
+    "1.0",
+    "1.0.0-01",
+    "1.0.0-",
+    "v1.0.0",
+    "1.0.0+",
+  ];
+  for (const value of valid) {
+    if (!SEMVER_2_0_0.test(value)) fail(`internal SemVer parser rejects valid value ${value}`);
+  }
+  for (const value of invalid) {
+    if (SEMVER_2_0_0.test(value)) fail(`internal SemVer parser admits invalid value ${value}`);
+  }
+}
+
 function parseReleaseIdentifier(policy, identifier) {
   const versioning = policy.versioning;
   if (!versioning || versioning.scheme !== "semver-2.0.0") {
@@ -163,6 +190,8 @@ function buildOnce(policy, wranglerCli, label) {
 }
 
 function main() {
+  verifySemverImplementation();
+
   const args = parseArgs(process.argv.slice(2));
   const policyBytes = readFileSync(POLICY_PATH);
   const policy = JSON.parse(policyBytes.toString("utf8"));
