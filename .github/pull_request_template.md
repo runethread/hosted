@@ -25,6 +25,7 @@ Check every class that applies.
 - Hosted base `main` SHA: `...`
 - Branch/head SHA reviewed: `...`
 - Core invariant-authority commit verified: `...`
+- Core versioning-authority commit verified when release/version identity is in scope: `...`
 - Core architecture/current ADR state verified: `...`
 - Active Hosted ruleset / required checks + expected status-check source: `...`
 - Current provider/toolchain documentation verified where relevant: `...`
@@ -53,6 +54,7 @@ Check every class that applies.
 | Development pipeline / required checks | |
 | Dependency classification / lockfile | |
 | Licensing / commercial model | |
+| Versioning authority / component SemVer | |
 | Release identity / executable artifact digest | |
 | Hosted request/status/cancel protocol | |
 | Authentication / caller authorization | |
@@ -94,8 +96,12 @@ For material pipeline/repository-policy/dependency/toolchain/CI-self-protection 
 - [ ] Dependency advisory/license/platform implications were reviewed.
 - [ ] Generated Worker Env plus compatibility-locked runtime types are committed and `wrangler types --check` passes.
 
-## Release identity / compatibility gate
+## Versioning / release identity / compatibility gate
 
+- [ ] ADR-028 and the current protected Core `docs/runethread/VERSIONING.md` were checked when component version/release identity is affected.
+- [ ] Hosted consumes an immutable Core versioning-authority commit/blob rather than copying a second local versioning policy.
+- [ ] The raw SemVer 2.0.0 value and Runethread `v`-prefixed release identifier are treated as distinct representations and both are validated/recorded where applicable.
+- [ ] Core, Hosted, and adapter version numbers are independent; numeric equality is not used as a compatibility rule.
 - [ ] `release/identity-policy.json` was checked when this change can affect runtime/build/protocol compatibility.
 - [ ] No floating Core/provider/runtime identity was introduced; exact Core release/commit and actual implemented protocol identities are represented.
 - [ ] Components that do not exist yet remain explicitly `not_implemented`/false rather than receiving invented version numbers.
