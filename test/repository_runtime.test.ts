@@ -447,6 +447,63 @@ describe("repository SQLite journal foundation", () => {
     });
   });
 
+  it("persists a future wakeup when an alarm fires during an in-flight append", async () => {
+    const { scope, stub, store } = fixture();
+    await stub.initializeJournalFoundation(scope, BINDING);
+    const before = await inside(stub, async (_instance, ctx) => {
+      const state = JSON.parse(ctx.storage.sql.exec<{ state: string }>("SELECT state FROM repository_runtime").one().state);
+      state.retryAt = Date.now() + 60_000; // Keep automatic delivery outside the bounded manual-alarm test.
+      ctx.storage.sql.exec("UPDATE repository_runtime SET state = ?", JSON.stringify(state));
+      await ctx.storage.setAlarm(state.retryAt);
+      return state;
+    });
+    expect(before.phase).toBe("opening");
+    const scheduled = await stub.inspectJournalFoundation();
+    expect(JSON.parse(scheduled.state)).toEqual(before);
+    expect(before.retryAt).toBeGreaterThan(Date.now());
+    expect(scheduled.alarm).toBe(before.retryAt);
+    await stub.armJournalCreateGate();
+    // Setup's inside() has returned. Hold Driver A through ordinary RPC only.
+    let driverFinished = false;
+    const driver = stub.driveJournalFoundation().finally(() => { driverFinished = true; });
+    try {
+      expect(await Promise.race([stub.waitForJournalCreate(), driver.then(() => {
+        throw new Error("driver finished before the create gate");
+      })])).toBe(true);
+      expect(driverFinished).toBe(false);
+      expect(await runDurableObjectAlarm(stub)).toBe(true);
+      expect(driverFinished).toBe(false);
+      // Only the alarm helper uses inside(); observation is passive ordinary RPC.
+      const busy = await stub.inspectJournalFoundation();
+      const busyState = JSON.parse(busy.state);
+      expect(busyState.retryAt).toBeGreaterThan(Date.now());
+      expect(busy.alarm).not.toBeNull();
+      expect(busy.alarm).toBe(busyState.retryAt);
+      expect(busyState.retryAt).toBe(before.retryAt);
+      expect(busy.alarm).toBe(before.retryAt);
+      expect(busyState).toEqual(before);
+      expect(busy.gate).toEqual({ armed: true, entered: true, released: false,
+        attempts: 1, completed: 0, attemptedEntry: JSON.stringify(before.pending) });
+      expect(driverFinished).toBe(false);
+    } finally {
+      try { await stub.releaseJournalCreateGate(); }
+      finally { await driver; }
+    }
+    expect(driverFinished).toBe(true);
+    const after = await stub.inspectJournalFoundation();
+    expect(after.gate).toEqual({ armed: true, entered: true, released: true,
+      attempts: 1, completed: 1, attemptedEntry: JSON.stringify(before.pending) });
+    const afterState = JSON.parse(after.state);
+    expect(afterState).toMatchObject({ phase: "scanning", generation: before.generation, pending: null });
+    expect(after.alarm).toBe(afterState.retryAt);
+    expect((await readCompleteTail(store, scope)).entries).toEqual([before.pending]);
+    await stub.disarmJournalCreateGate();
+    expect(await finish(stub)).toMatchObject({ phase: "verified", generation: 1, checkpoint: { sequence: 1 } });
+    expect((await readCompleteTail(store, scope)).entries.map(entry => entry.record.event.kind))
+      .toEqual(["EPOCH_OPEN", "RECOVERY_BARRIER"]);
+    expect(await runDurableObjectAlarm(stub)).toBe(false);
+  });
+
   it("ignores completion from a superseded generation and permits only one in-flight driver", async () => {
     const { scope, stub } = fixture();
     await stub.initializeJournalFoundation(scope, BINDING);

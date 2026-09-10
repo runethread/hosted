@@ -220,7 +220,19 @@ export class RepositoryRuntime extends DurableObject {
     }
   }
 
-  async alarm(): Promise<void> { await this.driveJournalFoundation(); }
+  async alarm(): Promise<void> {
+    if (this.#driving) {
+      const state = this.#read();
+      if (state && state.phase !== "verified" && state.phase !== "blocked") {
+        // A fired alarm is consumed even while another driver awaits I/O.
+        // Persist its successor without depending on that driver's finally.
+        this.#advance(state, { retryAt: Math.max(state.retryAt ?? 0, Date.now() + RETRY_MS) });
+        await this.#repairAlarm();
+      }
+      return;
+    }
+    await this.driveJournalFoundation();
+  }
 
   async driveJournalFoundation(): Promise<void> {
     if (this.#driving) return;
